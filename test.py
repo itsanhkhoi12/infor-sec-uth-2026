@@ -1,5 +1,6 @@
 from aes import AES
-
+from sha256 import SHA256
+from hashlib import sha256
 # AES testing
 aes = AES('LEHUYNHANHKHOI24')
 print(aes.encrypt('DLK24DHGTVTTPHCM'))
@@ -19,3 +20,9 @@ aes_256 = AES("This is a 256bit key, 32 chars!!")
 ciphertext = aes_256.encrypt("Sixteen byte txt")
 print("AES-256 Encrypted:", ciphertext)
 print("AES-256 Decrypted:", aes_256.decrypt(ciphertext))
+
+# SHA256 testing
+hashed = SHA256('DAIHOCGIAOTHONGVANTAI').generating_hash()
+lib_hashed = sha256('DAIHOCGIAOTHONGVANTAI'.encode('utf-8')).hexdigest()
+print("Library hash:", lib_hashed)
+print("Pure Implemention:", hashed)
