@@ -2,6 +2,6 @@
 
 Các thuật toán chính cần triển khai:
 - [x] AES
-- [-] SHA2
+- [x] SHA2
 - [-] Elliptic
 - [-] Kyber
