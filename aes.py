@@ -60,35 +60,40 @@ def transpose_matrix(matrix: list[list[any]]):
     return [[matrix[j][i] for j in range(len(matrix))] for i in range(len(matrix[0]))]
     
 def text_to_matrix(text: str) -> list[list[int]]:
-    matrix = [[], [], [], []]
-    for i in range(len(text)):
-        byte = ord(text[i])
-        matrix[i % 4].append(byte)
+    matrix = [[] for _ in range(4)]
+    for index, char in enumerate(text):
+        matrix[index % 4].append(ord(char))
     return matrix
 
 def hex_to_matrix(hex_text: str) -> list[list[int]]:
-    matrix = [[], [], [], []]
-    for i in range(16):
-        byte = int(hex_text[2 * i: 2 * i + 2], 16)
-        matrix[i % 4].append(byte)
+    matrix = [[] for _ in range(4)]
+    for index in range(16):
+        byte = int(hex_text[2 * index: 2 * index + 2], 16)
+        matrix[index % 4].append(byte)
     return matrix
 
 def matrix_to_text(matrix: list[list[int]]) -> str:
-    return ''.join(hex(matrix[i][j])[2:].zfill(2) for j in range(4) for i in range(4))
+    row_count = len(matrix)
+    column_count = len(matrix[0]) if matrix else 0
+    return ''.join(hex(matrix[row][column])[2:].zfill(2) for column in range(column_count) for row in range(row_count))
 
 def matrix_to_ascii(matrix: list[list[int]]) -> str:
-    return ''.join(chr(matrix[i][j]) for j in range(4) for i in range(4))
+    row_count = len(matrix)
+    column_count = len(matrix[0]) if matrix else 0
+    return ''.join(chr(matrix[row][column]) for column in range(column_count) for row in range(row_count))
 
 
 def bytes_to_matrix(block: bytes) -> list[list[int]]:
-    matrix = [[], [], [], []]
-    for i, byte in enumerate(block):
-        matrix[i % 4].append(byte)
+    matrix = [[] for _ in range(4)]
+    for index, byte in enumerate(block):
+        matrix[index % 4].append(byte)
     return matrix
 
 
 def matrix_to_bytes(matrix: list[list[int]]) -> bytes:
-    return bytes(matrix[i][j] for j in range(4) for i in range(4))
+    row_count = len(matrix)
+    column_count = len(matrix[0]) if matrix else 0
+    return bytes(matrix[row][column] for column in range(column_count) for row in range(row_count))
 
 class AES:
     def __init__(self, secret_key: str, mode: str = 'ecb', iv: str | bytes = None):
@@ -111,14 +116,14 @@ class AES:
         self.change_keys(secret_key)
 
     def __sub_bytes(self, state_matrix: list[list[int]]):
-        for i in range(4):
-            for j in range(self.n_b):
-                state_matrix[i][j] = SBOX[state_matrix[i][j]]
+        for row in range(len(state_matrix)):
+            for column in range(len(state_matrix[row])):
+                state_matrix[row][column] = SBOX[state_matrix[row][column]]
 
     def __sub_bytes_inv(self, state_matrix: list[list[int]]):
-        for i in range(4):
-            for j in range(self.n_b):
-                state_matrix[i][j] = INV_SBOX[state_matrix[i][j]]
+        for row in range(len(state_matrix)):
+            for column in range(len(state_matrix[row])):
+                state_matrix[row][column] = INV_SBOX[state_matrix[row][column]]
 
     def __getting_round(self) -> int:
         if self.n_b == 4 and self.n_k == 4:
@@ -133,12 +138,12 @@ class AES:
         return 12
 
     def __shift_rows_inv(self, state_matrix: list[list[int]]):
-        for i in range(1, 4):
-            state_matrix[i] = state_matrix[i][-i:] + state_matrix[i][:-i]
+        for row in range(1, len(state_matrix)):
+            state_matrix[row] = state_matrix[row][-row:] + state_matrix[row][:-row]
 
     def __shift_rows(self, state_matrix: list[list[int]]):
-        for i in range(1, 4):
-            state_matrix[i] = state_matrix[i][i:] + state_matrix[i][:i]
+        for row in range(1, len(state_matrix)):
+            state_matrix[row] = state_matrix[row][row:] + state_matrix[row][:row]
     
     def __mix_single_column(self, *col: list[int]):
         a = gmul(col[0],0x02) ^ gmul(col[1],0x03) ^ col[2] ^ col[3]
@@ -148,8 +153,8 @@ class AES:
         return a, b, c, d
 
     def __mix_columns(self, state_matrix: list[list[int]]):
-        for i in range(self.n_b):
-            state_matrix[0][i], state_matrix[1][i], state_matrix[2][i], state_matrix[3][i] = self.__mix_single_column(state_matrix[0][i], state_matrix[1][i], state_matrix[2][i], state_matrix[3][i])
+        for column in range(len(state_matrix[0])):
+            state_matrix[0][column], state_matrix[1][column], state_matrix[2][column], state_matrix[3][column] = self.__mix_single_column(state_matrix[0][column], state_matrix[1][column], state_matrix[2][column], state_matrix[3][column])
 
     def __mix_single_column_inv(self, *col: list[int]):
        a = gmul(col[0],0x0e) ^ gmul(col[1],0x0b) ^ gmul(col[2],0x0d) ^ gmul(col[3],0x09)
@@ -160,8 +165,8 @@ class AES:
        return a, b, c, d
 
     def __mix_columns_inv(self, state_matrix: list[list[int]]):
-        for i in range(self.n_b):
-            state_matrix[0][i], state_matrix[1][i], state_matrix[2][i], state_matrix[3][i] = self.__mix_single_column_inv(state_matrix[0][i], state_matrix[1][i], state_matrix[2][i], state_matrix[3][i])
+        for column in range(len(state_matrix[0])):
+            state_matrix[0][column], state_matrix[1][column], state_matrix[2][column], state_matrix[3][column] = self.__mix_single_column_inv(state_matrix[0][column], state_matrix[1][column], state_matrix[2][column], state_matrix[3][column])
 
     def change_keys(self, secret_key):
         self.n_k = len(secret_key) // 4
@@ -223,9 +228,9 @@ class AES:
             self.round_keys[i:i + 4] = transpose_matrix(self.round_keys[i:i + 4])
 
     def __add_round_key(self, state_matrix: list[list[int]], round_key: list[list[int]]):
-        for i in range(4):
-            for j in range(4):
-                state_matrix[i][j] = state_matrix[i][j] ^ round_key[i][j]
+        for row in range(len(state_matrix)):
+            for column in range(len(state_matrix[row])):
+                state_matrix[row][column] = state_matrix[row][column] ^ round_key[row][column]
 
     def __round_encrypt(self, state_matrix, round_key_matrix):
         
@@ -346,7 +351,7 @@ class AES:
 
         self.__sub_bytes(self.state_matrix)
         self.__shift_rows(self.state_matrix)
-        last_round_start = self.n_b * self.n_round
+        last_round_start = 4 * self.n_round
         self.__add_round_key(self.state_matrix, self.round_keys[last_round_start:])
 
         return matrix_to_bytes(self.state_matrix).hex()
@@ -354,7 +359,7 @@ class AES:
     def __decrypt_ecb_block(self, ciphertext: str) -> bytes:
         self.cipher_state_matrix = hex_to_matrix(ciphertext)
 
-        last_round_start = self.n_b * self.n_round
+        last_round_start = 4 * self.n_round
         self.__add_round_key(self.cipher_state_matrix, self.round_keys[last_round_start:])
         self.__shift_rows_inv(self.cipher_state_matrix)
         self.__sub_bytes_inv(self.cipher_state_matrix)
