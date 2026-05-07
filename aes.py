@@ -254,7 +254,7 @@ class AES:
 
     def __encrypt_ecb(self, plaintext: str) -> str:
         plaintext_bytes = self.__normalize_text(plaintext)
-        padded_plaintext = self.__pkcs7_pad(plaintext_bytes, self.block_size)
+        padded_plaintext = self.__pkcs7_pad(plaintext_bytes, self.block_size) if len(plaintext_bytes) > self.block_size else plaintext_bytes
 
         ciphertext = bytearray()
         for offset in range(0, len(padded_plaintext), self.block_size):
@@ -273,14 +273,18 @@ class AES:
             block = ciphertext_bytes[offset:offset + self.block_size]
             plaintext.extend(self.__decrypt_ecb_block(block.hex()))
 
-        try:
-            return self.__pkcs7_unpad(bytes(plaintext), self.block_size).decode('ascii')
-        except ValueError:
-            return bytes(plaintext).decode('ascii')
+        plaintext_bytes = bytes(plaintext)
+        if len(plaintext_bytes) > self.block_size:
+            try:
+                plaintext_bytes = self.__pkcs7_unpad(plaintext_bytes, self.block_size)
+            except ValueError:
+                pass
+        
+        return plaintext_bytes.decode('ascii')
 
     def __encrypt_cbc(self, plaintext: str) -> str:
         plaintext_bytes = self.__normalize_text(plaintext)
-        padded_plaintext = self.__pkcs7_pad(plaintext_bytes, self.block_size)
+        padded_plaintext = self.__pkcs7_pad(plaintext_bytes, self.block_size) if len(plaintext_bytes) > self.block_size else plaintext_bytes
 
         iv = self.iv if self.iv is not None else secrets.token_bytes(self.block_size)
         if len(iv) != self.block_size:
@@ -317,7 +321,14 @@ class AES:
             plaintext.extend(decrypted_block[i] ^ previous_block[i] for i in range(self.block_size))
             previous_block = block
 
-        return self.__pkcs7_unpad(bytes(plaintext), self.block_size).decode('ascii')
+        plaintext_bytes = bytes(plaintext)
+        if len(plaintext_bytes) > self.block_size:
+            try:
+                plaintext_bytes = self.__pkcs7_unpad(plaintext_bytes, self.block_size)
+            except ValueError:
+                pass
+        
+        return plaintext_bytes.decode('ascii')
 
     def __encrypt_ecb_block(self, plaintext: str | bytes) -> str:
         if isinstance(plaintext, str):
