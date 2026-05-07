@@ -1,6 +1,11 @@
+import secrets
+
 RCON = (
             0x00, 0x01, 0x02, 0x04, 0x08, 
             0x10, 0x20, 0x40, 0x80, 0x1B, 0x36)
+
+BLOCK_SIZE = 16
+
 
 INV_SBOX = (
         0x52, 0x09, 0x6a, 0xd5, 0x30, 0x36, 0xa5, 0x38, 0xbf, 0x40, 0xa3, 0x9e, 0x81, 0xf3, 0xd7, 0xfb,
@@ -50,7 +55,7 @@ def gmul(val, coeff):
             val ^= 0x11b
         coeff >>= 1
     return p
-        
+
 def transpose_matrix(matrix: list[list[any]]):
     return [[matrix[j][i] for j in range(len(matrix))] for i in range(len(matrix[0]))]
     
@@ -74,12 +79,30 @@ def matrix_to_text(matrix: list[list[int]]) -> str:
 def matrix_to_ascii(matrix: list[list[int]]) -> str:
     return ''.join(chr(matrix[i][j]) for j in range(4) for i in range(4))
 
+
+def bytes_to_matrix(block: bytes) -> list[list[int]]:
+    matrix = [[], [], [], []]
+    for i, byte in enumerate(block):
+        matrix[i % 4].append(byte)
+    return matrix
+
+
+def matrix_to_bytes(matrix: list[list[int]]) -> bytes:
+    return bytes(matrix[i][j] for j in range(4) for i in range(4))
+
 class AES:
-    def __init__(self, secret_key: str):
+    def __init__(self, secret_key: str, mode: str = 'ecb', iv: str | bytes = None):
+        mode = mode.lower()
+        if mode not in ('ecb', 'cbc'):
+            raise ValueError("mode must be either 'ecb' or 'cbc'")
 
         self.n_k = len(secret_key) // 4
         if len(secret_key) not in (16, 24, 32):
             raise ValueError('Length of input key must be in (128bit,192bit,256bit)!')
+
+        self.mode = mode
+        self.block_size = BLOCK_SIZE
+        self.iv = self.__normalize_iv(iv) if iv is not None else None
 
         self.n_b = 4
 
@@ -218,6 +241,106 @@ class AES:
         self.__sub_bytes_inv(state_matrix)
 
     def decrypt(self, ciphertext: str):
+        if self.mode == 'cbc':
+            return self.__decrypt_cbc(ciphertext)
+
+        return self.__decrypt_ecb(ciphertext)
+
+    def encrypt(self, plaintext: str):
+        if self.mode == 'cbc':
+            return self.__encrypt_cbc(plaintext)
+
+        return self.__encrypt_ecb(plaintext)
+
+    def __encrypt_ecb(self, plaintext: str) -> str:
+        plaintext_bytes = self.__normalize_text(plaintext)
+        padded_plaintext = self.__pkcs7_pad(plaintext_bytes, self.block_size)
+
+        ciphertext = bytearray()
+        for offset in range(0, len(padded_plaintext), self.block_size):
+            block = padded_plaintext[offset:offset + self.block_size]
+            ciphertext.extend(bytes.fromhex(self.__encrypt_ecb_block(block)))
+
+        return ciphertext.hex()
+
+    def __decrypt_ecb(self, ciphertext: str) -> str:
+        ciphertext_bytes = bytes.fromhex(ciphertext)
+        if len(ciphertext_bytes) == 0 or len(ciphertext_bytes) % self.block_size != 0:
+            raise ValueError('ECB ciphertext must be a non-empty multiple of 16 bytes')
+
+        plaintext = bytearray()
+        for offset in range(0, len(ciphertext_bytes), self.block_size):
+            block = ciphertext_bytes[offset:offset + self.block_size]
+            plaintext.extend(self.__decrypt_ecb_block(block.hex()))
+
+        try:
+            return self.__pkcs7_unpad(bytes(plaintext), self.block_size).decode('ascii')
+        except ValueError:
+            return bytes(plaintext).decode('ascii')
+
+    def __encrypt_cbc(self, plaintext: str) -> str:
+        plaintext_bytes = self.__normalize_text(plaintext)
+        padded_plaintext = self.__pkcs7_pad(plaintext_bytes, self.block_size)
+
+        iv = self.iv if self.iv is not None else secrets.token_bytes(self.block_size)
+        if len(iv) != self.block_size:
+            raise ValueError(f'IV must be {self.block_size} bytes')
+        self.iv = iv
+
+        previous_block = iv
+        ciphertext = bytearray(iv)
+
+        for offset in range(0, len(padded_plaintext), self.block_size):
+            block = padded_plaintext[offset:offset + self.block_size]
+            xored_block = bytes(block[i] ^ previous_block[i] for i in range(self.block_size))
+            encrypted_block_hex = self.__encrypt_ecb_block(xored_block)
+            encrypted_block = bytes.fromhex(encrypted_block_hex)
+            ciphertext.extend(encrypted_block)
+            previous_block = encrypted_block
+
+        return ciphertext.hex()
+
+    def __decrypt_cbc(self, ciphertext: str) -> str:
+        ciphertext_bytes = bytes.fromhex(ciphertext)
+        if len(ciphertext_bytes) < self.block_size * 2 or len(ciphertext_bytes) % self.block_size != 0:
+            raise ValueError('CBC ciphertext must contain IV plus at least one block')
+
+        iv = ciphertext_bytes[:self.block_size]
+        encrypted_blocks = ciphertext_bytes[self.block_size:]
+
+        previous_block = iv
+        plaintext = bytearray()
+
+        for offset in range(0, len(encrypted_blocks), self.block_size):
+            block = encrypted_blocks[offset:offset + self.block_size]
+            decrypted_block = self.__decrypt_ecb_block(block.hex())
+            plaintext.extend(decrypted_block[i] ^ previous_block[i] for i in range(self.block_size))
+            previous_block = block
+
+        return self.__pkcs7_unpad(bytes(plaintext), self.block_size).decode('ascii')
+
+    def __encrypt_ecb_block(self, plaintext: str | bytes) -> str:
+        if isinstance(plaintext, str):
+            plaintext = self.__normalize_text(plaintext)
+
+        if len(plaintext) != self.block_size:
+            raise ValueError(f'ECB block plaintext must be exactly {self.block_size} bytes')
+
+        self.n_b = 4
+        self.state_matrix = bytes_to_matrix(plaintext)
+
+        self.__add_round_key(self.state_matrix, self.round_keys[:4])
+        for i in range(1, self.n_round):
+            self.__round_encrypt(self.state_matrix, self.round_keys[4 * i:4 * (i + 1)])
+
+        self.__sub_bytes(self.state_matrix)
+        self.__shift_rows(self.state_matrix)
+        last_round_start = self.n_b * self.n_round
+        self.__add_round_key(self.state_matrix, self.round_keys[last_round_start:])
+
+        return matrix_to_bytes(self.state_matrix).hex()
+
+    def __decrypt_ecb_block(self, ciphertext: str) -> bytes:
         self.cipher_state_matrix = hex_to_matrix(ciphertext)
 
         last_round_start = self.n_b * self.n_round
@@ -230,25 +353,52 @@ class AES:
 
         self.__add_round_key(self.cipher_state_matrix, self.round_keys[:4])
 
-        return matrix_to_ascii(self.cipher_state_matrix)
+        return matrix_to_bytes(self.cipher_state_matrix)
 
-    def encrypt(self, plaintext: str):
-        self.n_b = len(plaintext) // 4
-    
-        if len(plaintext) not in (16, 24, 32):
-            raise ValueError('Length of plaintext must be in (128bit,192bit,256bit)!')
-        
-        self.state_matrix = text_to_matrix(plaintext)
-        
-        # Initialize State Matrix before Round 1
-        self.__add_round_key(self.state_matrix, self.round_keys[:4])
-        for i in range(1, self.n_round):
-            self.__round_encrypt(self.state_matrix, self.round_keys[4 * i:4 * (i + 1)])
+    @staticmethod
+    def __normalize_text(text: str) -> bytes:
+        if isinstance(text, bytes):
+            return text
+        return text.encode('ascii')
 
-        # No MixColumns func in final round
-        self.__sub_bytes(self.state_matrix)
-        self.__shift_rows(self.state_matrix)
-        last_round_start = self.n_b * self.n_round
-        self.__add_round_key(self.state_matrix, self.round_keys[last_round_start:])
-        
-        return matrix_to_text(self.state_matrix)
+    @staticmethod
+    def __normalize_iv(iv: str | bytes) -> bytes:
+        if isinstance(iv, bytes):
+            if len(iv) != BLOCK_SIZE:
+                raise ValueError(f'IV must be {BLOCK_SIZE} bytes')
+            return iv
+
+        if isinstance(iv, str):
+            try:
+                iv_bytes = bytes.fromhex(iv)
+                if len(iv_bytes) == BLOCK_SIZE:
+                    return iv_bytes
+            except ValueError:
+                pass
+
+            iv_bytes = iv.encode('ascii')
+            if len(iv_bytes) != BLOCK_SIZE:
+                raise ValueError(f'IV must be {BLOCK_SIZE} bytes or {BLOCK_SIZE * 2} hex characters')
+            return iv_bytes
+
+        raise TypeError('IV must be str or bytes')
+
+    @staticmethod
+    def __pkcs7_pad(data: bytes, block_size: int = 16) -> bytes:
+        padding_length = block_size - (len(data) % block_size)
+        if padding_length == 0:
+            padding_length = block_size
+        return data + bytes([padding_length]) * padding_length
+
+    @staticmethod
+    def __pkcs7_unpad(data: bytes, block_size: int = 16) -> bytes:
+        if not data or len(data) % block_size != 0:
+            raise ValueError('Invalid PKCS7 padded data')
+
+        padding_length = data[-1]
+        if padding_length < 1 or padding_length > block_size:
+            raise ValueError('Invalid PKCS7 padding')
+        if data[-padding_length:] != bytes([padding_length]) * padding_length:
+            raise ValueError('Invalid PKCS7 padding')
+
+        return data[:-padding_length]
