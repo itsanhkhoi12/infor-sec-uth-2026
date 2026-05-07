@@ -3,7 +3,6 @@ import secrets
 
 from sha256 import SHA256
 
-
 class SchnorrDigitalSignature:
     def __init__(self, p: int = None, q: int = None, a: int = None):
         self.p = p
