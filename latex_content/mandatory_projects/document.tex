@@ -1,0 +1,31 @@
+\documentclass[a4paper,12pt]{report}
+\input{preamble}
+\begin{document}
+
+% Bìa
+
+	\input{cover}
+
+% Danh mục chính
+	\tableofcontents
+	\newpage
+	\listoftables
+	\newpage
+	\listoffigures
+% Các mục chính
+\input{sections/theoretical_basis}
+\input{sections/algorithms}
+\input{sections/code_implement}
+\input{sections/evaluation}
+\newpage 
+	
+% Mục lục
+\input{appendix}
+
+% Tài liệu tham khảo
+\newpage
+\renewcommand{\bibname}{Tài liệu tham khảo}
+\bibliographystyle{IEEEtranS}
+\bibliography{references}
+
+\end{document}

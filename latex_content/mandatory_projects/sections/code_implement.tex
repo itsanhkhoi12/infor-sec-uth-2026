@@ -1,0 +1,942 @@
+\chapter{Xây dựng và lập trình}
+
+\section{Môi trường và công cụ}
+
+\begin{itemize}
+	\item Ngôn ngữ lập trình: Python 3.1\textbf{x}.
+	\item Môi trường triển khai: Trình soạn thảo source code \texttt{VSCode} và môi trường lập trình tương tác \texttt{Jupyter Notebook}.
+	\item Các thư viện hỗ trợ trong quá trình triển khai (Ngoài các thư viện được liệt kê ở dưới thì trong quá trình triển khai thuật toán, chỉ tái sử dụng các thư viện tự làm và hoàn toàn không dùng thêm thư viện nào khác):
+	\begin{description}
+		\item \texttt{secrets} - Dùng để sinh số ngẫu nhiên an toàn.
+		\item \texttt{dataclasses}: Hỗ trợ định dạng kiểu dữ liệu cho các khái niệm trong quá trình triển khai, ví dụ: Điểm trên Đường cong Elliptic, Các tham số chung của Miền,...
+		\item \texttt{hashlibs, cryptography}: Dùng để kiểm thử, đối chiếu kết quả với thuật toán đã triển khai.
+		\item \texttt{timeit}: Dùng để đo thời gian thực thi thuật toán, đánh giá hiệu năng
+	\end{description}
+
+	\item Trong quá trình triển khai các thuật toán, đầu vào luôn mã hóa dưới định dạng \texttt{ascii}
+\end{itemize}
+
+\section{Cấu trúc các file}
+\begin{table}[H]
+	\centering
+	\caption{Các file triển khai và thuật toán tương ứng}
+	\label{tab:algorithms}
+	\begin{tabular}{|l|l|}
+		\hline
+		\textbf{Tên File} & \textbf{Thuật Toán} \\
+		\hline
+		\texttt{aes.py} & Thuật toán mã hóa đối xứng AES (AES-128/192/256) \\
+		\hline
+		\texttt{sha256.py} & Thuật toán SHA-256 \\
+		\hline
+		\texttt{ecc\_math.py} & Các phép toán trên đường cong Elliptic \\
+		\hline
+		\texttt{eccdh.py} & Trao đổi khóa Elliptic Curve Diffie-Hellman (ECDH) \\
+		\hline
+		\texttt{ec\_asymmetric.py} & Thuật toán mã hóa bất đối xứng Elliptic Curve ElGamal  \\
+		\hline
+		\texttt{schnorr\_digital\_signature.py} & Lược đồ chữ ký số Schnorr \\
+		\hline
+	\end{tabular}
+\end{table}
+
+\section{Thiết kế cấu trúc các thuật toán mật mã}
+
+\subsection{Thuật toán mã hóa đối xứng}
+
+Thuật toán được triển khai thông qua lớp AES, mã hóa khối 128~bit. Lớp này có hai chức năng chính là mã hóa và giải mã, với mỗi cách thực hiện sẽ tùy thuộc vào chế độ hoạt động mã khối:
+
+\begin{lstlisting}[language=Python]
+	def decrypt(self, ciphertext: str):
+		if self.mode == 'cbc':
+			return self.__decrypt_cbc(ciphertext)
+		return self.__decrypt_ecb(ciphertext)
+	
+	def encrypt(self, plaintext: str):
+		if self.mode == 'cbc':
+			return self.__encrypt_cbc(plaintext)
+		return self.__encrypt_ecb(plaintext)
+	
+\end{lstlisting}
+
+Lớp \texttt{AES} được thiết kế để hỗ trợ hai chế độ hoạt động là ECB (Electronic Codebook) và CBC (Cipher Block Chaining), với khóa đầu chuẩn có độ dài là 128-bit, 192-bit và 256-bit. Cấu trúc lớp được khởi tạo như sau:
+
+\begin{lstlisting}[language=Python]
+	class AES:
+		def __init__(self, secret_key: str, mode: str = 'ecb',
+			iv: str | bytes = None):
+			mode = mode.lower()
+			if mode not in ('ecb', 'cbc'):
+				raise ValueError("Mode must be either 'ecb' or 'cbc'")
+	
+			self.n_k = len(secret_key) // 4
+			if len(secret_key) not in (16, 24, 32):
+				raise ValueError('Length of input key must be in (128bit,192bit,256bit)!')
+	
+	self.mode = mode
+	self.block_size = BLOCK_SIZE
+	self.iv = self.__normalize_iv(iv) if iv is not None else None
+	self.n_b = 4
+	self.n_round = self.__getting_round()
+	self.change_keys(secret_key) #KeyExpension
+\end{lstlisting}
+
+Số vòng lặp \texttt{n\_round} được xác định dựa trên kích thước khóa: 10 vòng cho khóa 128-bit, 12 vòng cho khóa 192-bit và 14 vòng cho khóa 256-bit. Tham số \texttt{block\_size} là 16, tức là thuật toán chia các khối xử lý tương ứng với mỗi khối 128 bit. Vector khởi tạo \textit{iv} dùng trong chế độ \textbf{CBC}, mặc định là \texttt{None} nếu không truyền vào.
+
+\subsection{Thuật toán mã hóa bất đối xứng}
+
+Thuật toán mã hóa bất đối xứng được triển khai với hệ mật mã trên đường cong Elliptic, bao gồm ba thành phần chính:
+
+\subsubsection{Các phép toán trên đường cong Elliptic}
+
+Trong mật mã học, phương trình đường cong Elliptic được sử dụng trong hầu hết các hệ mật mã có dạng tổng quát là:
+
+\begin{center}
+	$y^2 = ax^3+bx+c (\mod p)$
+\end{center}
+
+Một cặp số nguyên $(x,y)$ thuộc đường cong Elliptic là Điểm thuộc EC (EC Point). Các tham số cho một đường cong Elliptic bao gồm điểm sinh $g$, hệ số phương trình đường cong Elliptic $a,b$, số nguyên tố modulo $p$ và $n$ là bậc của điểm sinh $g$.
+
+\begin{lstlisting}[language=Python]
+# EC Point defined
+Point = tuple[int, int] | None
+
+# Essential Parameters for Elliptic Curve
+@dataclass(frozen=True)
+class CurveParameters:
+	p: int
+	a: int
+	b: int
+	g: Point
+	n: int
+	
+\end{lstlisting}
+
+Lớp \texttt{EllipticCurveMath} có các phương thức là các công cụ tính toán trên đường cong Elliptic trên trường hữu hạn $p$, bao gồm: Cộng một điểm (\texttt{point\_add}); Cộng chính điểm đó (\texttt{point\_double}); Xác nhận điểm đó thuộc đường cong Elliptic (\texttt{is\_on\_curve}).
+
+Hàm khởi tạo của lớp \texttt{EllipticCurveMath} nhận một đường cong Elliptic (tức là \texttt{CurveParameters}):
+
+\begin{lstlisting}[language=Python]
+class EllipticCurveMath:
+	def __init__(self, curve: CurveParameters):
+		if curve is None:
+			raise ValueError('Curve is required')
+		self.curve = curve
+		self._validate_curve()
+
+	def _validate_curve(self) -> None:
+		if not self.is_on_curve(self.curve.g):
+			raise ValueError('Base point is not on the curve')
+		if self.scalar_mult(self.curve.n, self.curve.g) is not None:
+			raise ValueError('Base point does not have the expected order')
+	
+\end{lstlisting}
+
+\subsubsection{Thuật toán Diffie-Hellman sử dụng Đường cong Elliptic (\texttt{ECDH})}
+
+Lớp ECCDH dùng để sinh cặp khóa riêng-công khai, được khởi tạo với đường cong Elliptic (\texttt{CurveParameters}), khóa riêng (mặc định là \texttt{None}) nếu người dùng không truyền vào.
+
+Tham số đường cong Elliptic mặc định là SECP256K1 ($y^2=x^3+7$, được ứng dụng rộng rãi trong Bitcoin).
+
+\begin{lstlisting}
+	class ECCDH:
+		def __init__(self, private_key: int | None = None, curve: CurveParameters | None = None):
+		if curve is None:
+			curve = SECP256K1
+			self.curve = curve
+			self.private_key = private_key
+			self.public_key: Point = None
+			self.math = EllipticCurveMath(curve)
+	
+		if self.private_key is not None:
+			self._validate_private_key(self.private_key)
+			self.public_key = self.math.scalar_mult(self.private_key, self.curve.g)
+	
+\end{lstlisting}
+
+Tham số \texttt{math} tức là có thể thực hiện các phép toán trên đường cong Elliptic \texttt{curve} tương ứng.
+
+\subsubsection{Thuật toán EC ElGamal (\texttt{ECCAsymmetricFunction})}
+
+Lớp \texttt{ECCAsymmetricEncryption} được dùng để triển khai mã hóa bất đối xứng trên đường cong Elliptic. Lớp này được khởi tạo với khóa riêng \texttt{private\_key} và tham số đường cong \texttt{CurveParameters}; nếu người dùng không truyền tham số đường cong thì mặc định sẽ sử dụng \texttt{SECP256K1}.
+
+\texttt{SECP256K1} là đường cong có phương trình $y^2 = x^3 + 7$, được ứng dụng rộng rãi trong Bitcoin.
+
+Các phương thức chính của lớp gồm:
+\begin{itemize}
+	\item \texttt{gen\_key\_pair()}: sinh cặp khóa riêng -- công khai bằng cách sử dụng phương thức từ \texttt{gen\_key\_pair} \texttt{ECCDH}.
+	\item \texttt{encrypt()}: mã hóa dữ liệu đầu vào theo khóa công khai của người nhận.
+	\item \texttt{decrypt()}: giải mã dữ liệu đã mã hóa bằng khóa riêng tương ứng.
+\end{itemize}
+
+\begin{lstlisting}
+	def __init__(self, private_key: int | None = None, curve: CurveParameters | None = None):
+		if curve is None:
+			curve = SECP256K1
+			self.curve = curve
+			self.math = EllipticCurveMath(curve)
+			self.private_key = private_key
+			self.public_key: Point = None
+
+		if self.private_key is not None:
+			self._validate_private_key(self.private_key)
+			self.public_key = self.math.scalar_mult(self.private_key, self.curve.g)
+
+		if self.curve.p % 4 != 3:
+			raise ValueError('This implementation expects a prime field with p % 4 == 3')
+
+\end{lstlisting}
+
+Dòng kiểm tra \texttt{$self.curve.p ~\%~ 4~ != 3$} trên nhằm đảm bảo số nguyên tố $p$ của trường hữu hạn thỏa mãn $p \equiv 3 \pmod 4$. Lý do là phần cài đặt hiện tại sử dụng công thức rút gọn để tính căn bậc hai modulo nguyên tố:
+
+\[
+y = x^{(p+1)/4} \bmod p
+\]
+
+Công thức này chỉ đúng trực tiếp khi $p \equiv 3 \pmod 4$. Nếu điều kiện này không thỏa, việc tìm căn bậc hai trên đường cong có thể cho kết quả sai, dẫn đến lỗi khi ánh xạ byte thành điểm trên đường cong và ngược lại. Vì vậy hàm khởi tạo chủ động phát sinh ngoại lệ để tránh giải mã không chính xác.
+
+\subsection{Hàm băm: SHA-256}
+
+Lớp \texttt{SHA256} triển khai thuật toán băm SHA-256 với hàm khởi tạo nhận đầu vào là một tin nhắn $M$ có định dạng \texttt{bytearray}, \texttt{bytes} hoặc \texttt{str} và chuẩn hóa về \texttt{bytearray} trước khi xử lý.
+
+Chức năng chính của thuật toán này 
+sinh ra bản băm của tin nhắn ấy, độ dài của tin nhắn có thể tùy ý nhưng độ dài bản băm luôn cố định 512bit, đầu ra được biểu diễn dưới dạng thập lục phân.
+\begin{lstlisting}[language = Python]
+class SHA256:
+	def __init__(self, message: bytearray):
+		self.message = message
+		if isinstance(self.message,str):
+			self.message = bytearray(self.message,'ascii')
+		elif isinstance(self.message,bytes):
+			self.message = bytearray(self.message)
+		else:
+			raise TypeError    
+
+	def generating_hash(self):
+		self.__padding(self.message)
+		self.hashed_message = self.__hash_computation()
+		return format_hex_output(self.hashed_message)
+\end{lstlisting}
+
+\subsection{Thuật toán Chữ ký số}
+
+Lớp \texttt{SchnorrDigitalSignature} hiện thực lược đồ chữ ký số Schnorr. Bộ tham số hệ thống $(p, q, a)$ có thể được cung cấp trực tiếp hoặc tự sinh, trong đó $p$ và $q$ là các số nguyên tố lớn hơn 2 và thỏa $q ~\text{là thừa số nguyên tố của}~ (p-1)$, và $a^q = 1 \mod p$.
+
+\begin{lstlisting}[language=Python]
+	def __init__(self,p:int = None,q:int=None,a:int = None):
+		self.p = p
+		self.q = q
+		self.a = a
+	
+		self.private_key = None
+		self.public_key = None
+	
+		if self.p is not None or self.q is not None or self.a is not None:
+			if self.p is None or self.q is None or self.a is None:
+			raise ValueError("p, q, a must be provided together")
+	self._validate_parameters(self.p, self.q, self.a)
+\end{lstlisting}
+
+Hàm \texttt{\_validate\_parameters} dùng để xác thực các đầu vào tham số \texttt{p,q,a} có thỏa mãn yêu cầu của lược đồ hay không.
+
+\begin{lstlisting}[language=Python]
+	@staticmethod
+	def _validate_parameters(p: int, q: int, a: int) -> None:
+	if p <= 2 or q <= 2:
+	raise ValueError("p and q must be prime numbers > 2")
+	if (p - 1) % q != 0:
+	raise ValueError("q must divide (p - 1)")
+	if not (1 < a < p):
+	raise ValueError("a must satisfy 1 < a < p")
+	if pow(a, q, p) != 1:
+	raise ValueError("a must be in subgroup of order q")
+	if a == 1:
+	raise ValueError("a cannot be 1")
+	
+\end{lstlisting}
+
+Các phương thức chính của lớp này đó là phương thức sinh cặp khóa riêng - khóa công khai \texttt{gen\_key\_pair}; ký một thông điệp \texttt{sign} và xác nhận chữ ký đó \texttt{verify}. 
+
+\begin{lstlisting}[language=Python]
+	def gen_key_pair(self, p_bits: int = 512, q_bits: int = 160) -> tuple[int, int]:
+		pass
+	
+	def sign(self, message: str | bytes, private_key: int = None) -> tuple[int, int]:
+		pass
+	
+	def verify(self, message: str | bytes, signature: tuple[int, int], public_key: int = None) -> bool:
+		pass
+	
+\end{lstlisting}
+
+%Main implementation
+\section{Triển khai các thuật toán}
+
+\subsection{Thuật toán mã hóa đối xứng}
+
+\subsubsection{Sinh khóa}
+Hàm \texttt{change\_keys} có nhiệm vụ sinh toàn bộ khóa vòng (\textit{round keys}) từ khóa bí mật ban đầu. Trước hết, hàm xác định số từ khóa con \texttt{n\_k} dựa trên độ dài của khóa gốc, sau đó tính số vòng mã hóa tương ứng. Từ khóa ban đầu được tách thành các từ 32-bit và mở rộng dần để tạo ra toàn bộ lịch khóa dùng cho các vòng mã hóa và giải mã.
+\newpage
+\begin{lstlisting}[language=Python]
+	def change_keys(self, secret_key):
+		self.n_k = len(secret_key) // 4
+		self.n_round = self.__getting_round()
+	
+		total_words = self.n_b * (self.n_round + 1)
+	
+		self.round_keys = transpose_matrix(text_to_matrix(secret_key[:16]))
+	
+		if self.n_k == 6:
+			extra = text_to_matrix(secret_key[16:24])
+			for col in transpose_matrix(extra):
+				self.round_keys.append(col)
+		elif self.n_k == 8:
+			extra = text_to_matrix(secret_key[16:32])
+			for col in transpose_matrix(extra):
+				self.round_keys.append(col)
+\end{lstlisting}
+
+
+Trong quá trình sinh khóa, \texttt{n\_k} biểu diễn số từ 32-bit của khóa bí mật. Với AES-128 và AES-192, ta có \texttt{n\_k = 4} hoặc \texttt{n\_k = 6}, nên quá trình sinh khóa vòng chỉ cần áp dụng phép biến đổi tại các vị trí là bội của \texttt{n\_k}. Các từ còn lại chỉ cần XOR trực tiếp với từ cách đó \texttt{n\_k} vị trí.
+
+Riêng với AES-256, tức \texttt{n\_k = 8}, ngoài bước trên còn cần thêm một phép \texttt{SubWord} ở vị trí \texttt{i \% n\_k == 4}. Thực hiện thêm phép này trong AES-256 nhằm tăng độ khuếch tán và đảm bảo lịch khóa đủ mạnh. Vì vậy, tách riêng hai nhánh \texttt{n\_k <= 6} và \texttt{n\_k > 6} để phù hợp với từng chuẩn kích thước khóa.
+
+\begin{lstlisting}[language=Python]
+		if self.n_k <= 6:
+			for i in range(self.n_k, total_words):
+				self.round_keys.append([])
+			# Transform at multiple of n_k position
+			if i % self.n_k == 0:
+				first_temp_byte = self.round_keys[i - self.n_k][0] ^ SBOX[self.round_keys[i - 1][1]] ^ RCON[i // self.n_k]
+				self.round_keys[i].append(first_temp_byte)
+				for j in range(1, 4):
+					temp_byte = SBOX[self.round_keys[i - 1][(j + 1) % 4]] ^ self.round_keys[i - self.n_k][j]
+					self.round_keys[i].append(temp_byte)
+				# XOR 
+				else:
+					for j in range(4):
+					temp_byte = self.round_keys[i - 1][j] ^ self.round_keys[i - self.n_k][j]
+					self.round_keys[i].append(temp_byte)
+		else:
+			for i in range(self.n_k, total_words):
+				self.round_keys.append([])
+				if i \% self.n_k == 0:
+					first_temp_byte = self.round_keys[i - self.n_k][0] ^ SBOX[self.round_keys[i - 1][1]] ^ RCON[i // self.n_k]
+					self.round_keys[i].append(first_temp_byte)
+					for j in range(1, 4):
+						temp_byte = SBOX[self.round_keys[i - 1][(j + 1) % 4]] ^ self.round_keys[i - self.n_k][j]
+						self.round_keys[i].append(temp_byte)
+				elif i \% self.n_k == 4:
+					for j in range(4):
+						temp_byte = SBOX[self.round_keys[i - 1][j]] ^ 	self.round_keys[i - self.n_k][j]
+						self.round_keys[i].append(temp_byte)
+				else:
+					for j in range(4):
+						temp_byte = self.round_keys[i - 1][j] ^ self.round_keys[i - self.n_k][j]
+						self.round_keys[i].append(temp_byte)
+\end{lstlisting}
+
+\subsubsection{Chế độ \texttt{ECB} trong \texttt{encrypt} và \texttt{decrypt}}
+Ở chế độ ECB, mỗi khối được mã hóa trực tiếp qua các vòng. Khi giải mã, các bước được thực hiện theo thứ tự đảo ngược, từ khóa vòng cuối về khóa vòng đầu.
+
+\begin{lstlisting}[language=Python]
+	def __encrypt_ecb_block(self, plaintext: str | bytes) -> str:
+		if isinstance(plaintext, str):
+			plaintext = self.__normalize_text(plaintext)
+		if len(plaintext) != self.block_size:
+			raise ValueError(f'ECB block plaintext must be exactly {self.block_size} bytes')
+		self.n_b = 4
+		self.state_matrix = bytes_to_matrix(plaintext)
+		self.__add_round_key(self.state_matrix, self.round_keys[:4])
+		
+		for i in range(1, self.n_round):
+			self.__round_encrypt(self.state_matrix, self.round_keys[4 * i:4 * (i + 1)])
+			self.__sub_bytes(self.state_matrix)
+			self.__shift_rows(self.state_matrix)
+		# Last round	
+		last_round_start = 4 * self.n_round
+		self.__add_round_key(self.state_matrix, self.round_keys[last_round_start:])
+		return matrix_to_bytes(self.state_matrix).hex()
+	
+	def __decrypt_ecb_block(self, ciphertext: str) -> bytes:
+		self.cipher_state_matrix = hex_to_matrix(ciphertext)
+		# Starting from the last round
+		last_round_start = 4 * self.n_round
+		self.__add_round_key(self.cipher_state_matrix, self.round_keys[last_round_start:])
+		self.__shift_rows_inv(self.cipher_state_matrix)
+		self.__sub_bytes_inv(self.cipher_state_matrix)
+		for i in range(self.n_round - 1, 0, -1):
+			self.__round_decrypt(self.cipher_state_matrix, self.round_keys[4 * i : 4 * (i + 1)])
+			self.__add_round_key(self.cipher_state_matrix, self.round_keys[:4])
+		return matrix_to_bytes(self.cipher_state_matrix)
+\end{lstlisting}
+
+\subsubsection{Chế độ \texttt{CBC} trong \texttt{encrypt} và \texttt{decrypt}}
+Ở chế độ CBC, mỗi khối plaintext trước khi mã hóa sẽ được XOR với khối trước đó. Với khối đầu tiên, giá trị XOR này là vector khởi tạo \texttt{IV}. Sau đó khối kết quả mới được mã hóa bằng AES ở chế độ ECB, các khối plaintext giống nhau vẫn tạo ra các ciphertext khác nhau nếu khối trước đó khác nhau.
+
+Khi giải mã, hệ thống giải mã từng khối ciphertext bằng ECB trước, rồi XOR kết quả với khối trước đó để khôi phục plaintext gốc. Với khối đầu tiên, khối trước đó chính là \texttt{IV} được lấy từ đầu chuỗi ciphertext.
+
+\begin{lstlisting}[language=Python]
+	def __encrypt_cbc(self, plaintext: str) -> str:
+		plaintext_bytes = self.__normalize_text(plaintext)
+		padded_plaintext = self.__pkcs7_pad(plaintext_bytes, self.block_size) if len(plaintext_bytes) > self.block_size else plaintext_bytes
+		iv = self.iv if self.iv is not None else secrets.token_bytes(self.block_size)
+		if len(iv) != self.block_size:
+			raise ValueError(f'IV must be {self.block_size} bytes')
+		self.iv = iv
+		previous_block = iv
+		ciphertext = bytearray(iv)
+		for offset in range(0, len(padded_plaintext), self.block_size):
+			block = padded_plaintext[offset:offset + self.block_size]
+			xored_block = bytes(block[i] ^ previous_block[i] for i in range(self.block_size))
+			encrypted_block_hex = self.__encrypt_ecb_block(xored_block)
+			encrypted_block = bytes.fromhex(encrypted_block_hex)
+			ciphertext.extend(encrypted_block)
+			previous_block = encrypted_block
+		return ciphertext.hex()
+	
+	def __decrypt_cbc(self, ciphertext: str) -> str:
+		ciphertext_bytes = bytes.fromhex(ciphertext)
+		if len(ciphertext_bytes) < self.block_size * 2 or len(ciphertext_bytes) % self.block_size != 0:
+			raise ValueError('CBC ciphertext must contain IV plus at least one block')
+	
+		iv = ciphertext_bytes[:self.block_size]
+		encrypted_blocks = ciphertext_bytes[self.block_size:]
+	
+		previous_block = iv
+		plaintext = bytearray()
+	
+		for offset in range(0, len(encrypted_blocks), self.block_size):
+			block = encrypted_blocks[offset:offset + self.block_size]
+			decrypted_block = self.__decrypt_ecb_block(block.hex())
+			plaintext.extend(decrypted_block[i] ^ previous_block[i] for i in range(self.block_size))
+			previous_block = block
+	
+		plaintext_bytes = bytes(plaintext)
+	if len(plaintext_bytes) > self.block_size:
+		try:
+			plaintext_bytes = self.__pkcs7_unpad(plaintext_bytes, self.block_size)
+		except ValueError:
+			pass
+	
+	return plaintext_bytes.decode('ascii')
+\end{lstlisting}
+
+\subsubsection{Cơ chế padding PKCS7}
+Padding được dùng để bảo đảm dữ liệu đầu vào có độ dài phù hợp với kích thước khối của AES. Padding theo chuẩn \#PKCS7 sẽ thêm vào các byte có giá trị bằng chính số lượng byte cần đệm. 
+
+Nếu dữ liệu có kích thước là bội số của 128~bit, một khối padding đầy đủ vẫn được thêm vào để khi giải mã có thể loại bỏ chính xác.
+
+Nếu đầu vào là dữ liệu có kích thước~128bit, phần padding này được bỏ qua.
+
+Khi giải mã, chương trình kiểm tra tính hợp lệ của padding trước khi cắt bỏ phần đệm. Cách làm này giúp phát hiện dữ liệu bị sai hoặc bị chỉnh sửa trong quá trình truyền nhận.
+
+\begin{lstlisting}[language=Python]
+	@staticmethod
+	def __pkcs7_pad(data: bytes, block_size: int = 16) -> bytes:
+		padding_length = block_size - (len(data) % block_size)
+		if padding_length == 0:
+			padding_length = block_size
+		return data + bytes([padding_length]) * padding_length
+	
+	@staticmethod
+	def __pkcs7_unpad(data: bytes, block_size: int = 16) -> bytes:
+		if not data or len(data) % block_size != 0:
+			raise ValueError('Invalid PKCS7 padded data')
+	
+		padding_length = data[-1]
+		if padding_length < 1 or padding_length > block_size:
+			raise ValueError('Invalid PKCS7 padding')
+		if data[-padding_length:] != bytes([padding_length]) * padding_length:
+			raise ValueError('Invalid PKCS7 padding')
+	
+		return data[:-padding_length]
+\end{lstlisting}
+
+\subsubsection{Khởi tạo vector \texttt{IV}}
+Trong chế độ CBC, nếu người dùng không truyền \texttt{IV} khi khởi tạo đối tượng AES thì chương trình sẽ tự sinh một vector ngẫu nhiên có độ dài bằng kích thước khối. Điều này giúp mỗi lần mã hóa có thể cho ra ciphertext khác nhau ngay cả khi cùng một plaintext và cùng một khóa.
+
+Nếu \texttt{IV} được truyền vào, hàm \texttt{\_\_normalize\_iv} sẽ kiểm tra định dạng và độ dài hợp lệ trước khi sử dụng.
+
+\begin{lstlisting}[language=Python]
+def __encrypt_cbc(self, plaintext: str) -> str:
+	
+	...
+	
+	iv = self.iv if self.iv is not None else secrets.token_bytes(self.block_size)
+	if len(iv) != self.block_size:
+		raise ValueError(f'IV must be {self.block_size} bytes')
+	self.iv = iv
+	
+	...
+	
+\end{lstlisting}
+
+\subsection{Thuật toán mã hóa bất đối xứng}
+
+\subsubsection{Quy trình sinh cặp khóa}
+Hàm sinh cặp khóa tạo một khoá riêng ngẫu nhiên và tính khoá công khai bằng phép nhân vô hướng với điểm gốc của đường cong. Việc chọn khoá riêng trong khoảng $[1,n-1]$ đảm bảo tính đầy đủ trên nhóm cyclic sinh bởi điểm cơ sở.
+
+\begin{lstlisting}[language = Python]
+	def gen_key_pair(self) -> tuple[int, Point]:
+		private_key = secrets.randbelow(self.curve.n - 1) + 1
+		public_key = self.math.scalar_mult(private_key, self.curve.g)
+	
+		self.private_key = private_key
+		self.public_key = public_key
+		return private_key, public_key
+\end{lstlisting}
+
+
+\subsubsection{Tạo khóa bí mật chung}
+Sau khi có khoá riêng, nhân khoá riêng của bên này với khoá công khai của bên khác để thu được khóa chung.
+
+\begin{lstlisting}[language = Python]
+	def derive_shared_secret(self, peer_public_key: Point) -> tuple[int, str]:
+		if self.private_key is None:
+			raise ValueError('Private key is missing!')
+	
+		shared_point = self.math.scalar_mult(self.private_key, peer_public_key)
+		if shared_point is None:
+			raise ValueError('Shared point is point at infinity!')
+	
+		x_coord = shared_point[0]
+		x_bytes = x_coord.to_bytes((x_coord.bit_length() + 7) // 8 or 1, 'big')
+		return x_coord, x_bytes.hex()
+\end{lstlisting}
+
+
+\subsubsection{Mã hóa}
+Cài đặt mã hóa dùng khoá riêng của người gửi để tạo khóa chia sẻ chung, mã hóa tin nhắn thành điểm thuộc đường cong Elliptic. Code trả về khoá công khai tạm thời của người gửi cùng danh sách điểm ciphertext và một hàm băm kiểm tra toàn vẹn.
+
+\begin{lstlisting}[language = Python]
+	def encrypt(self, plaintext: str | bytes, receiver_public_key: Point) -> dict[str, object]:
+		receiver_public_key = self._normalize_point(receiver_public_key)
+		plaintext_bytes, encoding = self._normalize_plaintext(plaintext)
+		message_hash = SHA256(plaintext_bytes).generating_hash()
+	
+		sender_private = secrets.randbelow(self.curve.n - 1) + 1
+		sender_public = self.math.scalar_mult(sender_private, self.curve.g)
+		shared_point = self.math.scalar_mult(sender_private, receiver_public_key)
+		if shared_point is None:
+			raise ValueError('Shared point is point at infinity!')
+	
+		message_points = self._encode_message_to_points(plaintext_bytes)
+		ciphertext_points = [self.math.point_add(message_point, shared_point) for message_point in message_points]
+	
+		return {
+		'sender_public_key': sender_public,
+		'ciphertext_points': ciphertext_points,
+		'plaintext_hash': message_hash,
+		'encoding': encoding,
+	}
+\end{lstlisting}
+
+
+\subsubsection{Giải mã}
+Giải mã thực hiện nhân khóa riêng của người nhận với khóa công khai của người gửi để tái tạo khóa chia sẻ, sau đó trừ khóa chia sẻ khỏi mỗi điểm ciphertext để hồi phục điểm mật mã ban đầu và chuyển về byte.
+
+\begin{lstlisting}[language = Python]
+	def decrypt(self, payload: dict[str, object]) -> str | bytes:
+		if self.private_key is None:
+			raise ValueError('Private key is missing!')
+	
+		if 'sender_public_key' not in payload or 'ciphertext_points' not in payload:
+			raise ValueError('Ciphertext payload is incomplete')
+	
+		sender_public_key = self._normalize_point(payload['sender_public_key'])
+		encoding = str(payload.get('encoding', 'ascii'))
+		ciphertext_points = [self._normalize_point(point) for point in 	payload['ciphertext_points']]
+		expected_hash = str(payload.get('plaintext_hash', ''))
+	
+		shared_point = self.math.scalar_mult(self.private_key, sender_public_key)
+		if shared_point is None:
+			raise ValueError('Shared point is point at infinity!')
+	
+		plaintext_bytes = bytearray()
+		for ciphertext_point in ciphertext_points:
+			message_point = self.math.point_add(ciphertext_point, self._point_negate(shared_point))
+			plaintext_bytes.append(self._point_to_byte(message_point))
+	
+		actual_hash = SHA256(bytes(plaintext_bytes)).generating_hash()
+		if expected_hash and actual_hash != expected_hash:
+			raise ValueError('Plaintext checksum mismatch')
+	
+		if encoding == 'bytes':
+			return plaintext_bytes
+		return plaintext_bytes.decode(encoding)
+\end{lstlisting}
+
+\subsubsection{Các phép toán cơ bản trên đường cong}
+Đoạn mã sau trích từ \texttt{ecc\_math.py} trình bày các phép toán nhóm cần thiết: kiểm tra điểm, cộng điểm, nhân vô hướng và tính nghịch đảo modulo.
+
+\begin{lstlisting}[language = Python]
+	def is_on_curve(self, point: Point) -> bool:
+		if point is None:
+			return True
+	
+		x, y = point
+		left = (y * y) % self.curve.p
+		right = (pow(x, 3, self.curve.p) + self.curve.a * x + self.curve.b) % self.curve.p
+		return left == right
+	
+	def point_add(self, p1: Point, p2: Point) -> Point:
+		if p1 is None:
+			return p2
+		if p2 is None:
+			return p1
+	
+		x1, y1 = p1
+		x2, y2 = p2
+	
+		if x1 == x2 and (y1 + y2) % self.curve.p == 0:
+			return None
+	
+		if p1 == p2:
+			return self.point_double(p1)
+	
+		slope = ((y2 - y1) * self._mod_inverse(x2 - x1, self.curve.p)) % self.curve.p
+		x3 = (slope * slope - x1 - x2) % self.curve.p
+		y3 = (slope * (x1 - x3) - y1) % self.curve.p
+		return x3, y3
+	
+	def point_double(self, point: Point) -> Point:
+		if point is None:
+			return None
+	
+		x1, y1 = point
+		if y1 == 0:
+			return None
+	
+		slope = ((3 * x1 * x1 + self.curve.a) * self._mod_inverse(2 * y1, self.curve.p)) % self.curve.p
+		x3 = (slope * slope - 2 * x1) % self.curve.p
+		y3 = (slope * (x1 - x3) - y1) % self.curve.p
+		return x3, y3
+	
+	def scalar_mult(self, k: int, point: Point) -> Point:
+		if point is None:
+			return None
+		if k % self.curve.n == 0:
+			return None
+	
+		self._validate_point(point)
+	
+		result: Point = None
+		addend = point
+		scalar = k
+	
+		while scalar > 0:
+			if scalar & 1:
+			result = self.point_add(result, addend)
+			addend = self.point_double(addend)
+			scalar >>= 1
+	
+		return result
+	
+	@staticmethod
+	def _mod_inverse(value: int, modulus: int) -> int:
+		value %= modulus
+		if value == 0:
+			raise ZeroDivisionError('Inverse does not exist')
+		return pow(value, -1, modulus)
+\end{lstlisting}
+
+\subsection{Hàm băm SHA-256}
+
+\subsubsection{Lịch trình sinh tin nhắn}
+Sau khi nhận thông điệp, chương trình thực hiện đệm dữ liệu để độ dài cuối cùng chia hết cho 512 bit. Cụ thể, một bit \texttt{1} được thêm vào sau thông điệp, tiếp theo là các bit \texttt{0} cho đến khi còn lại đúng 64 bit cuối cùng để lưu độ dài ban đầu của thông điệp. 
+
+Sau khi đã có dữ liệu hợp lệ, phương thức \texttt{\_\_message\_expansion\_schedule()} chia thông điệp thành các khối 512 bit, rồi mở rộng mỗi khối thành 64 từ 32 bit phục vụ cho các vòng nén.
+
+\begin{lstlisting}[language=Python]
+	def __padding(self,message):
+		self.message_size = len(message)*8
+	
+		self.message.append(0x80)
+		
+		# Since its SHA-256, so padding 0 until last 8 bytes to add the original message length in hexa 
+		while len(self.message) % 64 != 56:
+			self.message.append(0x00)
+	
+		self.message+=self.message_size.to_bytes(8,'big')
+	
+	def __parsing(self, message):
+		blocks = []
+		for i in range(0,len(self.message),64):
+			blocks.append(message[i:i+64])
+		return blocks
+	
+	def __message_expansion_schedule(self):
+		padded_messages  = self.__parsing(self.message)
+		
+		for block in padded_messages:
+			message_scheduled = []
+		for i in range(0,64):
+			if i < 16:
+				message_scheduled.append(bytes(block[i*4:(i*4)+4]))
+			else:
+				ele1 = self.__sigma1(int.from_bytes(message_scheduled[i-2], 'big'))
+				ele2 = int.from_bytes(message_scheduled[i-7], 'big')
+				ele3 = self.__sigma0(int.from_bytes(message_scheduled[i-15], 'big'))
+				ele4 = int.from_bytes(message_scheduled[i-16], 'big')
+				# Mod 2^32                   
+				message_scheduled.append(((ele1+ele2+ele3+ele4)&0xffffffff).to_bytes(4,'big'))
+	
+		yield message_scheduled
+\end{lstlisting}
+
+\subsubsection{Một vòng nén}
+Mỗi vòng nén của SHA-256 cập nhật 8 thanh ghi trạng thái \texttt{a, b, c, d, e, f, g, h}. Trong mỗi vòng, chương trình lấy một từ thông điệp hiện tại, kết hợp với các hàm logic \texttt{Ch}, \texttt{Maj} và các phép xoay bit để tính ra hai giá trị trung gian \texttt{t1} và \texttt{t2}. Kết quả của vòng nén sẽ sinh ra trạng thái mới cho 8 thanh ghi, từ đó tạo nền cho vòng tiếp theo.
+
+\begin{lstlisting}[language=Python]
+	def __compression_round( self,
+		a: int,b: int,c: int,
+		d: int,e: int,f: int,
+		g: int,h: int,idx: int,
+		word: bytes
+	) -> tuple[int,int,int,int,int,int,int,int]:
+		word = int.from_bytes(word,'big') & 0xffffffff
+		t1 = (h + self.__capsigma1(e) + self.__ch(e,f,g) + K[idx] + word) & 0xffffffff
+		t2 = (self.__capsigma0(a) + self.__maj(a,b,c)) & 0xffffffff
+		return (t1+t2)&0xffffffff, a,b,c,(d+t1)&0xffffffff,e,f,g
+\end{lstlisting}
+
+\subsubsection{Tính toán băm}
+Phương thức \texttt{\_\_hash\_computation()} là nơi thực hiện toàn bộ quá trình băm. 
+
+Trước hết, chương trình khởi tạo giá trị trạng thái ban đầu bằng 8 hằng số \texttt{H0} đến \texttt{H7}. Sau đó, với mỗi khối đã mở rộng, nó chạy liên tiếp 64 vòng nén. 
+
+Kết thúc một khối, giá trị trạng thái hiện tại được cộng dồn với kết quả vừa tính để tạo ra trạng thái băm trung gian. Khi xử lý hết các khối, chương trình trả về danh sách 8 từ cuối cùng, sau đó được chuyển thành chuỗi hexa.
+
+\begin{lstlisting}[language=Python]
+	def __hash_computation(self):
+		current_h = [H0, H1, H2, H3, H4, H5, H6, H7]
+		for schedule in self.__message_expansion_schedule():
+			a,b,c,d,e,f,g,h = current_h
+			for i in range(64):
+				a,b,c,d,e,f,g,h = self.__compression_round(a,b,c,d,e,f,g,h,i,schedule[i])
+	
+			for idx, val in enumerate([a,b,c,d,e,f,g,h]):
+				current_h[idx] = (current_h[idx] + val) & 0xffffffff
+	
+	return current_h
+\end{lstlisting}
+
+\subsection{Thuật toán chữ ký số Schnorr}
+
+\subsubsection{Sinh số nguyên tố (\texttt{\_generate\_prime})}
+Hàm \texttt{\_generate\_prime} tạo ra một số nguyên tố ngẫu nhiên có độ dài \texttt{bits} cụ thể bằng cách sinh các ứng cử viên ngẫu nhiên và kiểm tra tính nguyên tố của chúng.
+
+\begin{lstlisting}[language=Python]
+	def _generate_prime(self, bits: int) -> int:
+		while True:
+			candidate = secrets.randbits(bits)
+			candidate |= 1
+			candidate |= (1 << (bits - 1))
+			if self._is_probable_prime(candidate):
+				return candidate
+\end{lstlisting}
+
+Các bước sinh số nguyên tố:
+\begin{enumerate}[label=\textbf{Bước \arabic*.}]
+	\item \texttt{candidate = secrets.randbits(bits)}: Sinh một số ngẫu nhiên có đúng \texttt{bits} bit. Hàm \texttt{secrets.randbits} dùng bộ sinh số ngẫu nhiên an toàn mã hóa.
+	\item \texttt{candidate |= 1}: Đặt bit thấp nhất thành 1 bằng phép OR bitwise. Điều này đảm bảo số đang xét là số lẻ, vì mọi số nguyên tố lớn hơn 2 đều là lẻ.
+	\item \texttt{candidate |= (1 << (bits - 1))}: Đặt bit cao nhất thành 1. Phép toán này đảm bảo số đang xét thực sự có đúng \texttt{bits} bit, tức là $2^{\text{bits}-1} \leq \text{candidate} < 2^{\text{bits}}$.
+	\item Kiểm tra tính nguyên tố bằng \texttt{\_is\_probable\_prime}. Nếu số đó là nguyên tố, trả về chính nó. Nếu không, lặp lại quá trình cho đến khi tìm được số nguyên tố.
+\end{enumerate}
+
+\subsubsection{Kiểm tra tính nguyên tố (\_is\_probable\_prime)}
+Hàm \texttt{\_is\_probable\_prime} sử dụng thuật toán Miller-Rabin để kiểm tra xác suất một số là nguyên tố. Vì thử tất cả các ước để kiểm tra tính nguyên tố là quá chậm với các số lớn, thuật toán xác suất này được dùng để cân bằng giữa tốc độ và độ tin cậy.
+
+\begin{lstlisting}[language=Python]
+	@staticmethod
+	def _is_probable_prime(n: int, rounds: int = 40) -> bool:
+		if n < 2:
+			return False
+	
+		small_primes = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37]
+		for prime in small_primes:
+			if n == prime:
+				return True
+			if n % prime == 0:
+				return False
+	
+		d = n - 1
+		s = 0
+		while d % 2 == 0:
+			d //= 2
+			s += 1
+	
+		for _ in range(rounds):
+			a = secrets.randbelow(n - 3) + 2
+			x = pow(a, d, n)
+	
+		if x == 1 or x == n - 1:
+			continue
+	
+		witness_found = True
+		for _ in range(s - 1):
+			x = pow(x, 2, n)
+			if x == n - 1:
+				witness_found = False
+				break
+	
+		if witness_found:
+			return False
+	
+	return True
+\end{lstlisting}
+
+Thuật toán Miller-Rabin được tổ chức như sau:
+\begin{itemize}
+	\item \textbf{Kiểm tra cơ bản}: Nếu $n < 2$, trả về \texttt{False}. Nếu $n$ bằng một số nguyên tố nhỏ trong danh sách, trả về \texttt{True}. Nếu $n$ chia hết cho một số nguyên tố nhỏ (và $n$ lớn hơn nó), trả về \texttt{False}. Những kiểm tra này loại bỏ nhanh các trường hợp hiển nhiên.
+	\item \textbf{Phân tích thành $n - 1 = 2^s \cdot d$}: Biểu diễn $n - 1$ dưới dạng tích của lũy thừa 2 và một số lẻ $d$. Vòng \texttt{while} chia $d$ cho 2 lặp lại khi nó chẵn, đếm số lần chia vào biến $s$.
+	\item \textbf{Vòng lặp kiểm tra}: Lặp \texttt{rounds} lần (mặc định 40 lần). Mỗi lần:
+	\begin{itemize}
+		\item Chọn một giá trị ngẫu nhiên $a \in [2, n - 2]$.
+		\item Tính $x = a^d \bmod n$.
+		\item Nếu $x = 1$ hoặc $x = n - 1$, số đang xét này không phát hiện $n$ là hợp số, tiếp tục lần lặp tiếp theo.
+		\item Nếu không, lặp $s - 1$ lần, mỗi lần bình phương $x$ modulo $n$. Nếu tại bất kỳ lần nào $x = n - 1$, số đang xét này cũng không phát hiện được, đặt \texttt{witness\_found = False} và thoát vòng.
+		\item Nếu sau $s - 1$ lần bình phương, $x$ vẫn khác $n - 1$, thì $a$ là một "nhân chứng" chứng minh $n$ là hợp số. Trả về \texttt{False} ngay lập tức.
+	\end{itemize}
+	\item \textbf{Kết luận}: Nếu sau 40 vòng không tìm thấy nhân chứng, $n$ gần như chắc chắn là nguyên tố.
+\end{itemize}
+
+Thiết kế này tận dụng thực tế là nếu $n$ là hợp số, hầu hết các giá trị $a$ sẽ phát hiện điều này. Bằng cách lặp 40 lần với các giá trị $a$ ngẫu nhiên khác nhau, xác suất tất cả đều không phát hiện một hợp số là cực kỳ nhỏ.
+
+\subsubsection{Sinh tham số hệ thống}
+Hàm \texttt{\_generate\_parameters} tạo ra bộ ba tham số $(p, q, a)$ cần thiết cho hệ thống Schnorr. Các tham số này cần thỏa mãn các điều kiện: $q$ là số nguyên tố lớn, $p = kq + 1$ cũng là số nguyên tố, và $a$ là một phần tử sinh của nhóm con cấp $q$ modulo $p$. Cách tiếp cận từng bước giảm rủi ro tạo ra những tham số không hợp lệ và đảm bảo an toàn mã hóa.
+
+\begin{lstlisting}[language=Python]
+	def _generate_parameters(self, p_bits: int = 512, q_bits: int = 160) -> tuple[int, int, int]:
+		if p_bits <= q_bits:
+			raise ValueError("p_bits must be larger than q_bits")
+	
+		q = self._generate_prime(q_bits)
+	
+		min_k = 1 << (p_bits - q_bits - 1)
+		max_k = (1 << (p_bits - q_bits)) - 1
+	
+		p = None
+		for _ in range(20000):
+			k = secrets.randbelow(max_k - min_k + 1) + min_k
+			candidate_p = k * q + 1
+	
+		if candidate_p.bit_length() != p_bits:
+			continue
+		if self._is_probable_prime(candidate_p):
+			p = candidate_p
+			break
+	
+		if p is None:
+			raise RuntimeError("Failed to generate prime p with p = kq + 1")
+	
+		exponent = (p - 1) // q
+		a = 1
+		while a == 1:
+			h = secrets.randbelow(p - 3) + 2
+			a = pow(h, exponent, p)
+	
+		self._validate_parameters(p, q, a)
+		return p, q, a
+\end{lstlisting}
+
+Các bước sinh tham số được thực hiện như sau:
+\begin{enumerate}[label=\textbf{Bước \arabic*.}]
+	\item Trước tiên sinh $q$ là một số nguyên tố ngẫu nhiên có độ dài \texttt{q\_bits} bit.
+	\item Tiếp theo, tìm $k$ sao cho $p = kq + 1$ là số nguyên tố có đúng \texttt{p\_bits} bit. Quá trình này lặp tối đa 20000 lần để tìm được $p$ phù hợp.
+	\item Khi $p$ được xác định, tính giá trị \texttt{exponent} = $(p - 1) / q$ để sinh $a$ là phần tử có cấp đúng bằng $q$ modulo $p$. Điều này thực hiện bằng cách lấy một số ngẫu nhiên $h$ rồi tính $a = h^{\text{exponent}} \bmod p$.
+	\item Cuối cùng, kiểm tra tính hợp lệ của bộ ba tham số và trả về kết quả.
+\end{enumerate}
+
+\subsubsection{Sinh cặp khóa}
+Hàm \texttt{gen\_key\_pair} tạo ra cặp khóa công khai--riêng dựa trên các tham số hệ thống. Khóa riêng $s$ là một số ngẫu nhiên trong khoảng $[1, q - 1]$, còn khóa công khai $v$ được tính bằng $v = a^{-s} \bmod p$.
+
+\begin{lstlisting}[language=Python]
+	def gen_key_pair(self, p_bits: int = 512, q_bits: int = 160) -> tuple[int, int]:
+		if self.p is None or self.q is None or self.a is None:
+			self.p, self.q, self.a = self._generate_parameters(p_bits=p_bits, q_bits=q_bits)
+	
+		s = secrets.randbelow(self.q - 1) + 1
+		v = pow(self.a, -s, self.p)
+	
+		self.private_key = s
+		self.public_key = v
+		return s, v
+\end{lstlisting}
+
+Trong triển khai này:
+\begin{itemize}
+	\item Nếu các tham số hệ thống $(p, q, a)$ chưa được sinh, hàm sẽ tự động gọi \texttt{\_generate\_parameters} để tạo ra.
+	\item Khóa riêng $s$ được chọn ngẫu nhiên trong đoạn $[1, q - 1]$ bằng cách sử dụng \texttt{secrets.randbelow(self.q - 1) + 1}.
+	\item Khóa công khai $v$ được tính bằng $v = a^{-s} \bmod p$. Trong Python, cách ghi \texttt{pow(self.a, -s, self.p)} sử dụng modular inverse để thực hiện phép mũ với số mũ âm trong trường hữu hạn.
+	\item Cặp khóa được lưu vào đối tượng và cũng được trả về cho người dùng.
+\end{itemize}
+
+\subsubsection{Quy trình ký (sign)}
+Hàm \texttt{sign} tạo chữ ký số cho một tin nhắn sử dụng khóa riêng. Chữ ký gồm hai thành phần $(e, y)$: $e$ là giá trị hash được tính từ tin nhắn và một giá trị ngẫu nhiên $r$, còn $y$ được tính để đảm bảo $a^y \equiv a^r \pmod p$ khi người nhận xác thực tin nhắn.
+
+\begin{lstlisting}[language=Python]
+	def sign(self, message: str | bytes, private_key: int = None) -> tuple[int, int]:
+		if self.p is None or self.q is None or self.a is None:
+			raise ValueError("System parameters are not initialized!")
+	
+		s = private_key if private_key is not None else self.private_key
+		if s is None:
+			raise ValueError("Private key is missing!")
+		if not (1 <= s < self.q):
+			raise ValueError("Private key must satisfy 0 < s < q")
+	
+		message_bytes = self._normalize_message(message)
+	
+		r = secrets.randbelow(self.q - 1) + 1
+		x = pow(self.a, r, self.p)
+	
+		e = self._hash_challenge(message_bytes, x)
+		y = (r + (s * e)) % self.q
+		return e, y
+\end{lstlisting}
+
+Các bước trong quy trình ký:
+\begin{enumerate}[label=\textbf{Bước \arabic*.}]
+	\item Kiểm tra xem tham số hệ thống và khóa riêng có sẵn sàng hay không.
+	\item Chuẩn hóa tin nhắn thành dạng bytes.
+	\item Chọn một giá trị ngẫu nhiên $r \in [1, q - 1]$ và tính $x = a^r \bmod p$. 
+	\item Tính giá trị $e = \text{hash}(\text{message} \| x) \bmod q$. Giá trị $e$ phụ thuộc vào cả tin nhắn và giá trị $x$ ngẫu nhiên, điều này đảm bảo an toàn.
+	\item Tính $y = (r + s \cdot e) \bmod q$.
+	\item Chữ ký cuối cùng là cặp $(e, y)$.	
+\end{enumerate}
+
+\subsubsection{Quy trình xác thực (verify)}
+Hàm \texttt{verify} kiểm tra tính hợp lệ của một chữ ký số bằng cách khôi phục giá trị $x$ từ chữ ký và khóa công khai, rồi so sánh hash của $x$ với thành phần $e$ của chữ ký.
+
+\begin{lstlisting}[language=Python]
+	def verify(self, message: str | bytes, signature: tuple[int, int], public_key: int = None) -> bool:
+		if self.p is None or self.q is None or self.a is None:
+			raise ValueError("Global parameters are not initialized!")
+		if not isinstance(signature, tuple) or len(signature) != 2:
+			return False
+		e, y = signature
+		if not (0 <= e < self.q and 0 <= y < self.q):
+			return False
+		v = public_key if public_key is not None else self.public_key
+		if v is None:
+			raise ValueError("Public key is missing!")
+		if not (1 < v < self.p):
+			return False
+		message_bytes = self._normalize_message(message)
+		x_recovered = (pow(self.a, y, self.p) * pow(v, e, self.p)) % self.p
+		e_recovered = self._hash_challenge(message_bytes, x_recovered)
+		return e_recovered == e
+\end{lstlisting}
+
+Quy trình xác thực bao gồm như sau:
+\begin{enumerate}[label=\textbf{Bước \arabic*.}]
+	\item Kiểm tra các tham số hệ thống có sẵn sàng, chữ ký có đúng định dạng $(e, y)$ với cả hai thành phần trong đoạn $[0, q)$, và khóa công khai $v$ nằm trong khoảng $(1, p)$.
+	\item Bình thường hóa tin nhắn thành bytes.
+	\item Khôi phục giá trị $x$ từ công thức: $x = a^y \cdot v^e \bmod p$. 
+	\item Tính giá trị hash $e' = \text{hash}(\text{message} \| x)$.
+	\item Chữ ký hợp lệ nếu và chỉ nếu $e' == e$. Nếu không, chữ ký đã bị sai hoặc tin nhắn đã bị chỉnh sửa.
+\end{enumerate}
+
+Thiết kế này đảm bảo rằng chỉ có người sở hữu khóa riêng $s$ mới có thể tạo ra chữ ký hợp lệ. Những người khác, biết khóa công khai $v$ và chữ ký $(e, y)$, cũng có thể xác thực tính hợp lệ của nó mà không cần khóa riêng.

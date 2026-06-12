@@ -1,0 +1,313 @@
+
+
+
+
+\section{Mã hóa bằng tay thuật toán AES}
+
+PLAINTEXT = \textbf{DLK24DHGTVTTPHCM} \\
+CIPHER KEY =\textbf{LEHUYNHANHKHOI24}
+
+\subsection{Quy trình mở rộng khóa phụ}
+
+Thực hiện thuật toán mở rộng khóa nhằm sinh khóa phụ cho các vòng lặp mã hóa (\textbf{KeyExpension}) như sau:
+
+\begin{enumerate}[label= \textbf{Bước \arabic*:}]
+	\item Điền $N_k = 4$ từ đầu tiên bằng khóa mã hóa. Mỗi từ $W[i]$ tiếp theo sẽ được điền bằng kết quả phép \textbf{XOR} giữa từ $W[i-1]$ với $W[i-N_k]$ ($i \geq 4$). Đối với những trường hợp từ $W[i]$, với $i$ là bội số của $N_k$, thì ta cần thực hiện $transW(W[i-1])$, bao gồm các phép chuyển đổi $RWORD$, $SubBytes$ và $RCON$ với $W[i-1]$ rồi sau đó thực hiện phép $XOR$ với $W[i-N_k]$
+	
+	\textbf{Ví dụ:}  Ta thực hiện mở rộng khóa, bắt đầu bằng $W[4]$:
+	\begin{itemize}
+		\item Thực hiện phép $RWORD$, tức là biến từ đầu vào $(a,b,c,d) \text{ thành đầu ra }(b,c,d,a).$
+		\begin{center}
+			$
+			W[3] = 	\begin{bmatrix} 4F \\49 \\32 \\34 \end{bmatrix}
+			\xrightarrow{ROTWORD}
+			\begin{bmatrix}	49 \\32 \\34 \\4F \end{bmatrix}
+			$
+		\end{center}
+		
+		\item Thực hiện phép $SubBytes$ với bảng tham chiếu \textbf{S-box}:
+		\begin{center}
+			$
+			W[3] = \begin{bmatrix}	49 \\32 \\34 \\4F \end{bmatrix}
+			\xrightarrow{SUBBYTES}
+			\begin{bmatrix}	3B \\ 23 \\18\\84 \end{bmatrix}
+			$
+		\end{center}
+		
+		\item Thực hiện phép $RCON$, tức là ta sẽ XOR kết quả của phép \textbf{SubBytes} với hằng số vòng $RCON[i]$:
+		\begin{center}
+			$transW(W[3]) = W[4] \oplus RCON[1] = \begin{bmatrix}	3B \\ 23 \\18\\84 \end{bmatrix} \oplus \begin{bmatrix}	01 \\ 00 \\00\\00 \end{bmatrix}
+			= \begin{bmatrix} 3A\\23\\18\\84\end{bmatrix}$ 
+		\end{center}
+		\item Kết quả của phép $RCON$ cũng chính là đầu ra của phép biến đổi từ $W[i-1]$ với $i$ là bội số của $N_k$. Sau đó, ta thực hiện phép $XOR$ giữa kết quả phép biến đổi $W[i-1]$ với $W[i-N_k]$. Đầu ra của phép XOR này chính là từ $W[i]$ tiếp theo. 
+		\begin{center}
+			$W[4] = transW(W[3]) \oplus W[0] = \begin{bmatrix} 3A\\23\\18\\84\end{bmatrix} \oplus \begin{bmatrix} 4C\\45\\48\\55\end{bmatrix} = \begin{bmatrix} 76\\66\\50\\D1\end{bmatrix}$ 
+		\end{center}
+	\end{itemize}
+	
+	\item Tương tự với $W[5], W[6], W[7]$ ta thu được:
+	
+	\begin{center}
+		$W[5] = W[4] \oplus W[1] = \begin{bmatrix} 76\\66\\50\\D1\end{bmatrix} \oplus \begin{bmatrix} 4C\\45\\48\\55\end{bmatrix} = \begin{bmatrix} 2F\\28\\18\\90\end{bmatrix}$\\
+		$W[6] = W[5] \oplus W[2] = \begin{bmatrix} 2F\\28\\18\\90\end{bmatrix} \oplus \begin{bmatrix} 59\\4E\\48\\41\end{bmatrix} =  \begin{bmatrix} 61\\60\\53\\D8\end{bmatrix}$\\
+		$W[7] = W[6] \oplus W[3] = \begin{bmatrix} 61\\60\\53\\D8\end{bmatrix} \oplus \begin{bmatrix} 4F\\49\\32\\34\end{bmatrix} = \begin{bmatrix} 2E\\29\\61\\EC\end{bmatrix}$\\
+	\end{center}
+	
+	\item Sau khi điền $W[7]$, ta thu được khóa phụ thứ nhất ($RoundKey1= [W[4],W[5],W[6],W[7]]$):
+	\begin{center}
+		$
+		RoundKey1 = 
+		\begin{bmatrix}
+			76 & 2F & 61 & 2E\\
+			66 & 28 & 60 & 29 \\
+			50 & 18 & 53 & 61 \\
+			D1 & 90 & D8 & EC
+		\end{bmatrix}
+		$
+	\end{center}
+	
+	\item Thực hiện sinh khóa các vòng sau tương tự các bước trên, cho đến khi ta thu được khóa phụ cho vòng lặp mã hóa thứ 10 (\textbf{RoundKey10}).
+	
+\end{enumerate}
+
+\subsection{Quy trình mã hóa}
+Vì cả chiều dài của bản khối và khóa đều tương ứng với 128bit $\implies N_b = 4$ \& $N_k = 4$
+$\implies$ AES sẽ được thực hiện với số vòng lặp là 10.
+
+
+Quy trình thực hiện thuật toán mã hóa đối xứng AES như sau: 
+
+\begin{enumerate}[label= \textbf{Bước \arabic*:}]
+	\item Lần lượt chuyển đổi khối dữ liệu bản rõ $128 bit$ được chia thành $16 bytes$, tạo thành Ma trận Trạng thái (State) với kích cỡ $4x4$, tương tự với khóa mã hóa $128 bit$.
+	
+	% 44 4C 4B 32 34 44 48 47 54 56 54 54 50 48 43 4D (DLK24DHGTVTTPHCM)
+	% 4C 45 48 55 59 4E 48 41 4E 48 4B 48 4F 49 32 34 (LEHUYNHANHKHOI24)
+	
+	
+	\begin{center}
+		\begin{tabular}{cc}
+			$\begin{bmatrix}
+				44 & 34 & 54 & 50 \\
+				4C & 44 & 56 & 48 \\
+				4B & 48 & 54 & 43 \\
+				32 & 47 & 54 & 4D
+			\end{bmatrix}$ 
+			& 
+			$\begin{bmatrix}
+				4C & 59 & 4E & 4F \\
+				45 & 4E & 48 & 49 \\
+				48 & 48 & 4B & 32 \\
+				55 & 41 & 48 & 34
+			\end{bmatrix}$ \\
+			(a) Ma trận State & (b) Ma trận Cypher Key
+		\end{tabular}
+	\end{center}
+	
+	\item Thực hiện hàm \textbf{AddRoundKey}, nghĩa là thực hiện $State \oplus Round Key$ với mỗi bytes của States tại vị trí $[i][j]$ và bytes của RoundKey tại vị trí $[i][j]$ tương ứng. 
+	
+	Tại bước khởi tạo \textbf{AddRoundKey} đầu tiên, ta sẽ khởi tạo bằng cách thực hiện phép \textbf{XOR} giữa \textbf{Plaintext} với \textbf{CypherKey} ban đầu. 
+	
+	Hàm \textbf{AddRoundKey} ở các vòng tiếp theo, ta sẽ thực hiện phép \textbf{XOR} giữa output các phép biến đổi ở vòng trước kết hợp với khóa phụ \textbf{RoundKey} tương ứng.
+	
+	\textbf{Ví dụ:} Tại vị trí $[1][0]$,  $44 \oplus 4C = 0100 0100 \oplus 0100 1100 =0000 1000 = 8$
+	
+	\begin{align*}
+		\text{AddRoundKey} &= \text{StateMatrix} \oplus \text{CypherKey} \\
+		\text{AddRoundKey} &= 
+		\begin{bmatrix}
+			44 & 48 & 54 & 50 \\
+			4C & 47 & 56 & 48 \\
+			32 & 54 & 54 & 43 \\
+			44 & 56 & 54 & 4D
+		\end{bmatrix}
+		\oplus
+		\begin{bmatrix}
+			4C & 59 & 4E & 4F \\
+			45 & 4E & 48 & 49 \\
+			48 & 48 & 4B & 32 \\
+			55 & 41 & 48 & 34
+		\end{bmatrix} \\
+		\text{AddRoundKey} &= 
+		\begin{bmatrix}
+			08 & 6d & 1A & 1F \\
+			09 & 0A & 1E & 01 \\
+			03 & 00 & 1F & 71 \\
+			67 & 06 & 1C & 79
+		\end{bmatrix}
+	\end{align*}
+	
+	
+	%SubBytes%
+	\item Thực hiện phép thay phi tuyến tính thông qua hàm \textbf{SubBytes}, tức là ta sẽ thay thế từng byte trong output của hàm \textbf{AddRoundKey} bằng một bảng quy định giá trị thay thế, S-box \ref{tab:sbox}:
+	
+	\textbf{Ví dụ}: Tại vị trí $[1][0]$, byte tại vị trí này là ${08}$, ứng với bảng \textbf{S-box} tại hàng số 0, cột số 8 sẽ là byte $30$
+	\begin{center}
+		$\begin{bmatrix}
+			08 & 6d & 1A & 1F \\
+			09 & 0A & 1E & 01 \\
+			03 & 00 & 1F & 71 \\
+			67 & 06 & 1C & 79
+		\end{bmatrix}
+		\xrightarrow{SubBytes}
+		\begin{bmatrix}
+			30 & 3C & A2 & C0\\
+			01 & 67 & 72 & 7C\\
+			7B & 63 & C0 & A3\\
+			85 & 6F & 9C & B6 \\
+		\end{bmatrix}
+		$
+	\end{center}
+	
+	%ShiftRows%
+	\item \textbf{ShiftRows} có chức năng quay trái từng hàng trạng thái với hệ số quay $\{C_1, C_2, C_3\}$. Hàng đầu tiên (hàng số 0) sẽ không dịch chuyển. Tùy thuộc vào giá trị của $N_b$ mà hệ số quay sẽ tương ứng với chúng. Với $N_b = 4$: 
+	\begin{itemize}
+		\item Hàng 1 được dịch chuyển bởi $C_1 = 1$ byte
+		\item Hàng 2 được dịch chuyển bởi $C_2 = 2$ byte
+		\item Hàng 3 được dịch chuyển bởi $C_3 = 3$ byte
+	\end{itemize}
+	\begin{center}
+		$
+		\begin{bmatrix}
+			30 & 3C & A2 & C0\\
+			01 & 67 & 72 & 7C\\
+			7B & 63 & C0 & A3\\
+			85 & 6F & 9C & B6 \\
+		\end{bmatrix}
+		\xrightarrow{ShiftRows}
+		\begin{bmatrix}
+			30 & 3C & A2 & C0\\
+			67 & 72 & 7C & 01\\
+			C0 & A3 & 7B & 63\\
+			B6 & 85 & 6F & 9C\\
+		\end{bmatrix}
+		$
+		
+	\end{center}
+	
+	\item \textbf Phép biến đổi {MixColumns}, thực hiện tính toán từng cột của state. Các cột trong state được coi như một đa thức trong trường $GF(2^8)$. Việc biến đổi cột trạng thái được thực hiện vởi phép nhân ($\times$) và phép $\text{XOR }(\oplus)$.
+	
+	\textbf{Ví dụ:} Ta sẽ biến đổi cột đầu tiên $c_0$ của output \textbf{ShiftRows} bằng cách thực hiện phép biến đổi \textbf{MixColumns}:
+	\begin{center}
+		$c_0
+		=
+		\begin{bmatrix}
+			02 & 03 & 01 & 01 \\
+			01 & 02 & 03 & 01 \\
+			01 & 01 & 02 & 03\\
+			03 & 01 & 01 & 02 \\
+		\end{bmatrix} \begin{bmatrix} 30 \\ 67 \\ C0 \\B6 \end{bmatrix}
+		=  \begin{bmatrix} BF \\ 13 \\ 0D \\ 80 \end{bmatrix}$
+	\end{center}
+	
+	Xét phần tử đầu tiên của $c_0$: 
+	\begin{align*}
+		c_0[0] &= (02 \cdot 30) \oplus (03 \cdot 67) \oplus (01 \cdot C0) \oplus (01 \cdot B6)\\
+		c_0[0] &= 60 \oplus A9 \oplus C0 \oplus B6\\
+		c_0[0] &= BF
+	\end{align*}
+	
+	Thực hiện tương tự với các cột còn lại, ta thu được ouput của bước \textbf{MixColumns} như sau:
+	\begin{center}
+		$
+		\begin{bmatrix}
+			30 & 3C & A2 & C0\\
+			67 & 72 & 7C & 01\\
+			C0 & A3 & 7B & 63\\
+			B6 & 85 & 6F & 9C\\
+		\end{bmatrix}
+		\xrightarrow{MixColumns}
+		\begin{bmatrix}
+			BF & C8 & CF & 67\\
+			13 & A3 & B8 & FB\\
+			0D & 87 & 99 & B8\\
+			80 & 84 & 24 & 1A\\
+		\end{bmatrix}
+		$ 
+		
+		
+	\end{center}
+	
+	\item Thực hiện hàm \textbf{AddRoundKey} nhằm thêm khóa phụ cho vòng lặp thứ hai, ta thực hiện XOR giữa State (đầu ra của bước \textbf{MixColumns}) với \textbf{RoundKey1}
+	\begin{center}
+		$
+		\begin{bmatrix}
+			BF & C8 & CF & 67\\
+			13 & A3 & B8 & FB\\
+			0D & 87 & 99 & B8\\
+			80 & 84 & 24 & 1A\\
+		\end{bmatrix}
+		\oplus
+		\begin{bmatrix}
+			76 & 2F & 61 & 2E\\
+			66 & 28 & 60 & 29 \\
+			50 & 18 & 53 & 61 \\
+			D1 & 90 & D8 & EC
+		\end{bmatrix}
+		=
+		\begin{bmatrix}
+			C9 & E7 & AE & 49\\
+			75 & 8B & D8 & D2 \\
+			5D & 9F & CA & D9 \\
+			51 & 14 & FC & F6
+		\end{bmatrix}
+		$
+	\end{center}
+	\item Thực hiện quá trình mã hóa với các bước tương tự như vậy cho đến vòng lặp cuối cùng. Ở vòng lặp cuối cùng, ta không làm bước \textbf{MixColumns}.
+	
+	
+	\begin{table}[h]
+		\centering
+		\renewcommand{\arraystretch}{1.5}
+		
+		\setlength{\arraycolsep}{4pt} 
+		
+		\resizebox{\textwidth}{!}{
+			\normalsize 
+			\begin{tabular}{|c|c|c|c|c|c|c|}
+				\hline
+				\textbf{Round} & \textbf{Bắt đầu} & \textbf{Sau SubBytes} & \textbf{Sau ShiftRows} & \textbf{Sau MixColumns} & & \textbf{RoundKey} \\ \hline
+				
+				% Round 2
+				Round 2 & 
+				$\begin{array}{cccc} C9 & E7 & AE & 49 \\ 75 & 8B & D8 & D2 \\ 5D & 9F & CA & D9 \\ 51 & 14 & FC & F6 \end{array}$ & 
+				$\begin{array}{cccc} DD & 94 & E4 & 3B \\ 9D & 3D & 61 & B5 \\ 4C & DB & 74 & 35 \\ D1 & FA & B0 & 42 \end{array}$ & 
+				$\begin{array}{cccc} DD & 94 & E4 & 3B \\ 3D & 61 & B5 & 9D \\ 74 & 35 & 4C & DB \\ 42 & D1 & FA & B0 \end{array}$ & 
+				$\begin{array}{cccc} D0 & 74 & A1 & A1 \\ 79 & D8 & BB & DC \\ CE & F7 & DC & C0 \\ B1 & 4A & 21 & 70 \end{array}$ &
+				$\oplus$ &
+				$\begin{array}{cccc} D1 & FE & 9F & B1 \\ 89 & A1 & C1 & E8 \\ 9E & 86 & D5 & B4 \\ E0 & 70 & A8 & 44 \end{array}$ \\ \hline
+				
+				% Hàng trống gộp cột
+				\multicolumn{7}{|c|}{\dots} \\ \hline
+				
+				% Round 10
+				Round 10 & 
+				$\begin{array}{cccc} 8F & DF & A1 & 22 \\ 01 & 00 & 78 & 14 \\ B2 & 30 & E8 & 96 \\ AA & 1F & 2B & 16 \end{array}$ & 
+				$\begin{array}{cccc} 73 & 9E & 32 & 93 \\ 7C & 63 & BC & FA \\ 37 & 04 & 9B & 90 \\ AC & C0 & F1 & 47 \end{array}$ & 
+				$\begin{array}{cccc} 73 & 9E & 32 & 93 \\ 63 & BC & FA & 7C \\ 9B & 90 & 37 & 04 \\ 47 & AC & C0 & F1 \end{array}$ & 
+				--- & 
+				$\oplus$ &
+				$\begin{array}{cccc} C8 & F2 & 79 & 54 \\ 76 & 97 & CE & 19 \\ 13 & 3E & 76 & E8 \\ 4C & 46 & 67 & 89 \end{array}$ \\ \hline
+			\end{tabular}
+		}
+	\end{table}
+	
+\end{enumerate}
+
+Output của vòng lặp cuối cùng, cũng chính là đầu ra của thuật toán mã hóa đối xứng AES:
+
+\begin{center}
+	$
+	\text{AESEncryption(Plaintext, CypherKey)}
+	=
+	\begin{bmatrix}
+		BB & 6C & 4B & C7\\
+		15 & 2B & 34 & 65\\
+		88 & AE & 41 & EC\\
+		0B & EA & A7 & 78
+	\end{bmatrix}
+	$
+	
+\end{center}
+
+Vậy \textbf{Ciphertext} tương ứng là: $BB15880B6C2BAEEA4B3441A7C765EC78$
+

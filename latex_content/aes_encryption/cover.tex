@@ -1,0 +1,55 @@
+	\begin{titlepage}
+	\begin{tikzpicture}[remember picture,overlay,inner sep=0,outer sep=0]
+		\draw[blue!70!black,line width=4pt] ([xshift=-1.5cm,yshift=-2cm]current page.north east) coordinate (A)--([xshift=2.4cm,yshift=-2cm]current page.north west) coordinate(B)--([xshift=2.4cm,yshift=2cm]current page.south west) coordinate (C)--([xshift=-1.5cm,yshift=2cm]current page.south east) coordinate(D)--cycle;
+		
+		\draw ([yshift=0.5cm,xshift=-0.5cm]A)-- ([yshift=0.5cm,xshift=0.5cm]B)--
+		([yshift=-0.5cm,xshift=0.5cm]B) --([yshift=-0.5cm,xshift=-0.5cm]B)--([yshift=0.5cm,xshift=-0.5cm]C)--([yshift=0.5cm,xshift=0.5cm]C)--([yshift=-0.5cm,xshift=0.5cm]C)-- ([yshift=-0.5cm,xshift=-0.5cm]D)--([yshift=0.5cm,xshift=-0.5cm]D)--([yshift=0.5cm,xshift=0.5cm]D)--([yshift=-0.5cm,xshift=0.5cm]A)--([yshift=-0.5cm,xshift=-0.5cm]A)--([yshift=0.5cm,xshift=-0.5cm]A);
+		
+		\draw ([yshift=-0.3cm,xshift=0.3cm]A)-- ([yshift=-0.3cm,xshift=-0.3cm]B)--
+		([yshift=0.3cm,xshift=-0.3cm]B) --([yshift=0.3cm,xshift=0.3cm]B)--
+		([yshift=-0.3cm,xshift=0.3cm]C)--([yshift=-0.3cm,xshift=-0.3cm]C)--
+		([yshift=0.3cm,xshift=-0.3cm]C)-- ([yshift=0.3cm,xshift=0.3cm]D)--([yshift=-0.3cm,xshift=0.3cm]D)--([yshift=-0.3cm,xshift=-0.3cm]D)--([yshift=0.3cm,xshift=-0.3cm]A)--([yshift=0.3cm,xshift=0.3cm]A)--([yshift=-0.3cm,xshift=0.3cm]A);
+	\end{tikzpicture}
+	
+	\begin{center}
+		\vspace{-1cm}
+		{\Large TRƯỜNG ĐẠI HỌC GIAO THÔNG VẬN TẢI} \\
+		{\Large THÀNH PHỐ HỒ CHÍ MINH} \\
+		\textbf{\Large VIỆN CÔNG NGHỆ THÔNG TIN \\ĐIỆN, ĐIỆN TỬ}
+	\end{center}
+	% --- Logo trường ---
+	\vspace{1.5cm}
+	\begin{center}
+		\includegraphics[width=12cm]{logotruong.png} % Thay bằng logo trường
+	\end{center}
+	
+	\vspace{1.5cm} % Căn giữa trang
+	
+	% --- Tiêu đề báo cáo ---
+	\begin{center}
+		{\Huge \textbf{BÀI TẬP}
+			
+			\LARGE \textbf{MÃ HÓA VỚI THUẬT TOÁN AES }}
+		
+		{\LARGE HỌC PHẦN: \textbf{AN TOÀN THÔNG TIN}}
+	\end{center}
+	
+	\vfill
+	
+	% --- Thông tin sinh viên ---
+	\begin{center}
+		\begin{tabular}{l @{ : } l}
+			\large \textbf{Họ và tên} \\
+			\large \textbf{MSSV} \\
+			\large \textbf{Mã học phần} \\
+			\large \textbf{Giảng viên}
+		\end{tabular}
+		
+	\end{center}
+	
+	\vfill
+	
+	\begin{center}
+		TP. Hồ Chí Minh, tháng 5 năm 2026
+	\end{center}
+\end{titlepage}

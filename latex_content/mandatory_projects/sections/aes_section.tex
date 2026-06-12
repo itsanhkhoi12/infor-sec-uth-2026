@@ -1,0 +1,87 @@
+
+% Thuật toán, pseudocode và flowchart	
+\chapter{Thuật toán, mã giả và luồng hoạt động}
+\subsection{Cơ sở lý thuyết thuật toán AES}
+
+\subsubsection{Mã hóa đối xứng}
+
+Mã hóa khóa đối xứng là một loại phương pháp mã hóa sử dụng một khóa giống nhau để mã hóa, cũng như giải mã dữ liệu.
+
+Mã hóa khối đối xứng bắt đầu với thủ tục sinh khóa, tạo ra một khóa bí mật. Trong quá trình mã hóa, hệ thống dùng các thuật toán 
+
+
+\subsection{Thuật toán AES}
+
+Thuật toán AES 
+
+\subsubsection{}
+Các phép biến đổi khác nhau với kết quả trung gian được gọi là \textbf{Trạng thái}. Trạng thái có thể được biểu diễn dưới dạng byte hình chữ nhật. Một mảng thường bao gồm 4 hàng và số cột, kí hiệu là $N_b$, bằng chiều dài của khối chia cho 32 (khối 128bit, 192 và 256bit). Tương tự với khóa, khóa cũng được biểu diễn dưới dạng byte hình chữ nhật, bao gồm 4 hàng và số cột được kí hiệu là $N_k$, bằng chiều dài của khóa chia cho 32 (khóa 128, 192 và 256bit). Số chu kỳ được chỉ định trong thuật toán sẽ phụ thuộc vào giá trị của $N_b$ và $N_k$.\quad
+
+\begin{table}[h]
+	\centering
+	\begin{tabular}{|c|c|c|c|}
+		\hline
+		$N_r$ & $N_b = 4$ & $N_b = 6$ & $N_b = 8$ \\ \hline
+		$N_k = 4$ & 10 & 12 & 14 \\ \hline
+		$N_k = 6$ & 12 & 12 & 14 \\ \hline
+		$N_k = 8$ & 14 & 14 & 14 \\ \hline
+	\end{tabular}
+\end{table}
+
+Giải thuật AES được ứng dụng trong mã hóa \textbf{bản khối rõ}, bao gồm bốn bước xử lý chính như sau:
+
+\begin{enumerate}[label= \textbf{Bước \arabic*:}]
+	\item Mở rộng khóa nhằm thực hiện sinh các khóa chính (Round key), dùng trong các vòng lặp từ khóa chính sử dụng thủ tục sinh khóa \textbf{Rijndael}.
+	\item Vòng khởi tạo sẽ thực hiện hàm AddRoundKey, trong đó mỗi byte trong State được kết hợp với khóa vòng sử dụng phép XOR.
+	\item Với mỗi lặp chính, mỗi vòng sẽ bao gồm 4 hàm chính xử lý dữ liệu như sau:
+	\begin{itemize}
+		\item Tiến hành thay thế phi tuyến tính sử dụng hàm \textbf{SubBytes}, trong đó mỗi bytes trong state được thay thế bằng bytes khác sử dụng bảng tham chiếu S-box. Bảng tham chiếu này có thể đảo ngược và được xây dựng dựa trên hai phép biến đổi sau:
+		\begin{itemize}
+			\item Một phép nhân nghịch đảo trong trường hữu hạn $GF(2^8)$ được tính theo modulo một đa thức $m(x) = x^8 + x^4 + x^3 + x + 1$. $\{00\}$ được phản ánh trong chính nó.
+			\item Sau đó, một phép biến đổi \textbf{Affine} (trong $GF(2)$) được áp dụng và có định nghĩa như sau:
+			
+			\begin{align*}
+				\begin{bmatrix} 
+					y_0\\y_1\\ y_2\\y_3\\y_4\\y_5\\y_6\\y_7
+				\end{bmatrix} &= 
+				\begin{bmatrix}
+					1 & 0 & 0 & 0 & 1 & 1 & 1 & 1\\
+					1 & 1 & 0 & 0 & 0 & 1 & 1 & 1\\
+					1 & 1 & 1 & 0 & 0 & 0 & 1 & 1\\
+					1 & 1 & 1 & 1 & 0 & 0 & 0 & 1\\
+					1 & 1 & 1 & 1 & 1 & 0 & 0 & 0\\
+					0 & 1 & 1 & 1 & 1 & 1 & 0 & 0\\
+					0 & 0 & 1 & 1 & 1 & 1 & 1 & 0\\
+					0 & 0 & 0 & 1 & 1 & 1 & 1 & 1\\
+				\end{bmatrix}
+				\begin{bmatrix} 
+					x_0\\x_1\\x_2\\x_3\\x_4\\x_5\\x_6\\x_7
+				\end{bmatrix}
+				+
+				\begin{bmatrix}
+					1\\1\\0\\0\\0\\1\\1\\0
+				\end{bmatrix}
+			\end{align*}
+			
+		\end{itemize}
+		\item Mỗi dòng trong states được dịch một số bước trong chu kỳ, sử dụng hàm \textbf{ShiftRows}.
+		\item \textbf{MixColumns} làm trộn các cột trong states, kết hợp 4 bytes trong mỗi cột. 
+		Các cột trạng thái được coi là đa thức trong $GF(2^8)$ và nhân theo modulo $x^4+1$ với một đa thức cố định: $c(x)='03'x^3+'01'x^2+'01'x+02$ nghịch đảo.
+		
+		Biến đổi này có thể được biểu diễn như một phép nhân trong ma trân, với mỗi bytes là một phần tử trong trường $GF(2^8)$. Cho $b(x) = c(x) \times a(x)$:
+		\begin{center}
+			$\begin{bmatrix} b_0 \\ b_1 \\b_2 \\ b_3\end{bmatrix} =
+			\begin{bmatrix}
+				02 & 03 & 01 & 01 \\
+				01 & 02 & 03 & 01 \\
+				01 & 01 & 02 & 03\\
+				03 & 01 & 01 & 02 \\
+			\end{bmatrix}
+			\begin{bmatrix} a_0 \\ a_1 \\ a_2 \\ a_3 \\ \end{bmatrix}$
+		\end{center}
+		
+		\item \textbf{AddRoundKeys} là hàm kết hợp state với khóa vòng, sử dụng phép XOR.
+	\end{itemize}
+	\item Vòng lặp cuối cùng cũng tương tự các vòng chính khác, nhưng không thực hiện bước \textbf{MixColumns}.
+\end{enumerate}
+

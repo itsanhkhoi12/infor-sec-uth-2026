@@ -1,0 +1,130 @@
+\chapter{Cơ sở lý thuyết}
+
+\section{Tổng quan về mật mã học}
+Mật mã học là lĩnh vực nghiên cứu và ứng dụng các thuật toán toán học nhằm thiết lập các cơ chế bảo mật thông tin. Mục tiêu cốt lõi là đảm bảo tính bảo mật, cho phép dữ liệu chỉ có thể được tiếp cận và giải mã bởi các bên, người dùng được cấp quyền. Thông qua quá trình biến đổi dữ liệu gốc thành dạng bản mã, mật mã học tạo ra một rào cản ngăn chặn, giảm thiểu mọi hành vi truy cập trái phép từ các bên thứ ba trong quá trình truyền thông tin. \nocite{ibm_2023_cryptography}
+
+Lĩnh vực mật mã học hiện nay đã và đang ngày càng phát triển. Tuy nhiên, thay vì chỉ tập trung vào yếu tố kĩ thuật của mô hình CIA, xu hướng hiện nay đã chuyển dịch từ phát triển công nghệ bảo mật thuần túy sang quản trị rủi ro toàn diện. \nocite{pender-bey_2012}
+
+Mở rộng hơn mô hình CIA, khung Parkerian Hexad đã bổ sung thêm các yếu tố con người như \textbf{tính xác thực}, \textbf{tính sở hữu} và \textbf{tính hữu dụng}, kết hợp với các tính kĩ thuật truyền thống của mô hình CIA nhằm tạo thành các cặp tương hỗ: tính bảo mật - tính sở hữu, tính xác thực - tính toàn vẹn và tính sẵn sàng - tính hữu dụng.
+
+\subsection{Tính bảo mật}
+\textbf{Tính bảo mật (Confidentiality)} là một thuật ngữ đề cập đến ngăn chặn việc tiết lộ thông tin cho các cá nhân hoặc hệ thống chưa được cấp quyền. 
+
+Các hành vi vi phạm tính bảo mật rất đa dạng, từ việc sơ suất để người khác nhìn trộm màn hình đang hiển thị thông tin bí mật, để mất laptop chứa đựng dữ liệu nhạy cảm cho đến việc lộ thông tin qua các cuộc trò chuyện với người không có quyền tiếp cận thông tin. \nocite{hon_keung_2013} 
+
+\subsection{Tính toàn vẹn}
+Khái niệm \textbf{tính toàn vẹn (Integrity)} nghĩa là đảm bảo khả năng dữ liệu được bảo vệ nguyên vẹn, nhất quán, ngăn chặn khả năng sửa đổi trái phép bởi các thực thể, cá nhân không được phân quyền.
+
+Các trường hợp cá nhân có quyền truy cập vô tình xóa file thông tin quan trọng, chỉnh sửa file với các thông tin không chính xác hoặc cũng có thể đến từ nguyên nhân file đó bị nhiễm virus. Các trường hợp này vi phạm tính toàn vẹn. \nocite{pender-bey_2012}
+
+\subsection{Tính sẵn sàng}
+\textbf{Tính sẵn sàng (Availability)}, đề cập đến khả năng tiếp cận và sử dụng tài nguyên, thông tin ngay khi có nhu cầu. Để đạt được tính sẵn sàng, một hệ thống cần đảm bảo các thành phần con như tính toán và lưu trữ thông tin, thành phần bảo mật và các kênh giao tiếp phải được vận hành một cách trơn tru, chặt chẽ với nhau. 
+
+Mục tiêu của các hệ thống sẵn sàng cao hướng đến là đảm bảo hệ thống vận hành được tại mọi thời điểm, loại bỏ các sự gián đoạn với các nguyên nhân đến từ lỗi phần cứng, mất điện và bảo trì hệ thống. Ngoài ra, đảm bảo tính sẵ sàng cũng bao quát các cơ chế phòng chống các hình thức tấn công từ chối dịch vụ (DoS-Attack). \nocite{hon_keung_2013}
+
+\subsection{Tính xác thực}
+
+Ngoài ba yếu tố kĩ thuật của mô hình truyền thống CIA, khung Parkerian Hexad đã bổ sung thêm các yếu tố liên quan đến con người, tính xác thực là một trong những sự mở rộng so với mô hình CIA.
+
+\textbf{Tính xác thực} nghĩa là đảm bảo một tin nhắn, một giao dịch (transactions), thông tin được chuyển đến phải đến từ nguồn mà nó công bố thông tin đó. Khái niệm này có mối liên hệ mật thiết với thiết lập bằng chứng xác nhận danh tính. \nocite{lee_2009}
+	
+Yếu tố xác thực đóng vai trò quan trọng trong các hệ thống, chương trình có tương tác người dùng. Nhập username và mật khẩu là phương thức xác thực phổ biển nhất hiện nay. Tuy nhiên, mật khẩu có thể dễ dàng bị đánh cắp bởi hacker nếu như chúng quá ngắn hoặc dễ dàng đoán được.
+
+Đối với doanh nghiệp, hoặc các hệ thống quan trọng, xác thực 2 yếu tố hoặc xác thực đa yếu tố được sử dụng rộng rãi hơn. Hình thức xác thực đa yếu tố có thể sử dụng USB chứa token hoặc thông qua xác thực sinh trắc học,... Hạ tầng khóa công khai (PKI) sử dụng chứng chỉ số từ bên thứ 3 uy tín. Thiết lập kết nối SSL không chỉ mã hóa phiên làm việc cho bên cung cấp, mà còn cung cấp cơ chế xác thực danh tính cho bên nguồn đích. \nocite{lee_2009}
+
+\subsection{Tính sở hữu}
+
+Kiểm soát là một yếu tố từ Parkerian Hexad được mở rộng so với mô hình CIA. Yếu tố này được bổ sung nhằm thiết lập quyền bảo vệ tài sản thông tin trong trường hợp các bên không có quyền ủy thác, vẫn có thể chiếm giữ hoặc kiểm soát thông tin mà không cần phải phá vỡ lớp mã hóa, tức là chưa vi phạm \textbf{tính bảo mật (Confidentiality)}.
+
+Mọi hành vi vi phạm \textbf{tính bảo mật} đều dẫn đến \textbf{mất quyền sở hữu}. Tuy nhiên, ở chiều ngược lại, \textbf{mất quyền sở hữu} chưa chắc đã vi phạm \textbf{tính bảo mật}. Giả sử như có một thư ký đánh cắp một chiếc USB chứa đựng các thông tin quan trọng, nhưng chúng không tài nào truy cập được thông tin vì không có khóa để giải mã, tức là tuy đã \textbf{mất quyền sở hữu} nhưng vẫn đảm bảo được \textbf{tính bảo mật}. \nocite{marinus_2009}
+
+Tính kiểm soát, sở hữu chính là một trong những yếu tố đặt con người làm vị trí trung tâm trong lĩnh vực \textbf{An toàn thông tin}. Dữ liệu ngoài việc đảm bảo tính bảo mật, các bên được ủy quyền cũng phải có trách nhiệm sử dụng và khai thác chúng một cách hợp lý, đúng mực. 
+
+\subsection{Tính hữu dụng}
+
+\textbf{Tính hữu dụng (Utility)} là thành phần cốt lõi cuối cùng trong khung Parkerian Hexad. Yếu tố này đề cập đến nội dung, cũng như chất lượng của dữ liệu tại một thời điểm. Một thông tin có thể đang sẵn sàng để truy cập, nhưng điều đó không đồng nghĩa là thông tin đó đang ở định dạng, một trạng thái hữu ích để sử dụng. \nocite{parker2010our}
+
+ Giả sử có một người đang sở hữu ví Bitcoin, để có thể truy cập ví điện tử đó, anh ta cần phải có khóa để vào được. Ví điện tử của anh ta tồn tại trên hệ thống, nhưng anh ta không thể truy cập vào để giao dịch vì quên khóa bí mật (private key), ví đó coi như không còn mang tính hữu dụng với chủ sở hữu.
+ 
+ Nếu như tính sẵn sàng cao đề cập đến yếu tố dữ liệu phải luôn đảm bảo xuất hiện tại những thời điểm cần thiết, thì tính hữu dụng lại nhấn mạnh nội dung của dữ liệu và khả năng khai thác thông tin từ chúng tại một thời điểm nhất định. Đây là những bổ sung đã giúp cho khung Parkerian Hexad trở nên toàn diện, trọn vẹn và đầy đủ hơn so với mô hình CIA truyền thống trong bối cảnh lĩnh vực mật mã học hiện nay.
+
+\section{Các khái niệm cơ bản}
+
+\subsection{Bản rõ}
+
+Bản rõ chính là một hình thức thông tin được trình bày một cách rõ ràng, ai cũng có thể đọc được mà không cần phải sử dụng các công cụ giải mã, giải nén file nhị phân.
+
+Mọi loại file, hình thức giao tiếp, tài liệu cần được mã hóa hoặc đã được mã hóa trước đó đều là bản rõ (Plaintext). Một hệ thống ứng dụng mật mã học sẽ nhận bản rõ làm đầu vào, và trả về đầu ra là bản rõ đã được mã hóa (Ciphertext). \nocite{hemant_bhaat_2024}
+
+\subsection{Bản mã hóa}
+
+Kết quả đầu ra sau khi thực hiện quá trình mã hóa được gọi là bản mã hóa (Ciphertext). Các thuật toán chuyển đổi dữ liệu ban đầu (bản rõ) thành một dạng hình thức mà các thiết bị hoặc cá nhân không có quyền truy cập không thể đọc hiểu được, tức là bản mã (ciphertext). Quá trình này được gọi là \textbf{mã hóa (Encryption)}. Ngược lại với mã hóa, chuyển ciphertext ban đầu thành bản rõ có thể đọc được, gọi là quá trình \textbf{giải mã (Decryption}). \nocite{hemant_bhaat_2024}
+
+
+\subsection{Quá trình mã hóa và quá trình giải mã}
+Mã hóa là quá trình chuyển đổi một bản rõ thành một bản mã hóa không thể đọc nhằm che giấu thông tin quan trọng từ các cá nhân không có ủy quyền. \nocite{ibm_2021}
+
+Ngược lại với quá trình mã hóa, quá trình giải mã là quá trình chuyển đổi ciphertext sau khi được mã hóa về lại bản rõ có thể đọc được ban đầu. Quá trình này kết hợp khóa bí mật cũng như các thuật toán mật mã nhằm khôi phục thông tin ban đầu. \nocite{ibm_2021}
+
+\section{Phân loại hệ mật mã}
+
+\subsection{Mã hóa đối xứng}
+
+Mã hóa đối xứng là quá trình mã hóa và cũng như giải mã dữ liệu bằng một khóa bí mật đối xứng chung được chia sẻ với tất cả các bên có ủy quyền với dữ liệu đấy.
+
+Trong thực tế, các doanh nghiệp thường ứng dụng mã hóa đối xứng trong trường hợp cần mã hóa một lượng lớn dữ liệu, hoặc thành lập các phương thức, kênh giao tiếp nội bộ trong một hệ thống đóng. Lựa chọn này dựa trên ưu điểm của mã hóa đối xứng, chúng có cấu trúc đơn giản, khả năng tốc độ xử lý nhanh và đạt hiệu năng vượt trội so với mã hóa bất đối xứng. \nocite{badman_kosinski_2024}
+
+Một sơ đồ mã hóa đối xứng được phân thành hai loại chính, đó là: \textbf{Mã hóa khối (Block Cipher)} và \textbf{Mã hóa dòng (Stream Cipher)}:
+\begin{itemize}
+	\item \textbf{Mã hóa dòng (Stream Cipher)}: Bản rõ được mã hóa liên tục theo từng 1 bit (hoặc 1 byte) tại một thời điểm xác định. Bản mã dòng phù hợp với dữ liệu cần được mã hóa liên tục trong các ứng dụng theo thời gian thực. Các thuật toán tiêu biểu như RC4, Salsa20, và ChaCha20. \nocite{geeksforgeeks_2025}
+	\item \textbf{Mã hóa khối (Block Cipher)}: Chia bản rõ để mã hóa thành các khối có kích cỡ cố định (64bit hoặc 128bit), việc lựa chọn khối có kích cỡ không được quá bé, cũng như quá lớn, và thường là kích cỡ là bội số của 8 bit. Các thuật toán thường gặp có thể kể đến như AES, DES. \nocite{geeksforgeeks_2025}
+
+\end{itemize}
+
+\subsection{Mã hóa bất đối xứng}
+Mã hóa bất đối xứng là trình mã hóa và giải mã dữ liệu sử dụng hai khóa khác nhau. Bất kỳ ai cũng có thể sử dụng khóa công khai để mã hóa dữ liệu, nhưng chỉ những bên liên quan được cấp khóa bí mật mới có thể giải mã được dữ liệu ấy. 
+
+Các doanh nghiệp sử dụng mã hóa bất đối xứng trong trường hợp đề cao tính bảo mật của hệ thống, ví dụ như mã hóa thông tin nhạy cảm hoặc thiết lập các kênh giao tiếp trong một hệ thống mở (Internet). \nocite{ibm_2024}
+
+\subsection{Hàm băm}
+
+Hàm băm là quá trình sử dụng các thuật toán Toán học nhằm biến dữ liệu đầu vào thành tập hợp các kí tự có kích thước cố định. Chúng được ứng dụng trong xác thực tin nhắn, kiểm tra tính toàn vẹn của dữ liệu cũng như thiết lập chữ kí số.
+
+Hàm băm có các tính chất phổ biến như sau:
+\begin{itemize}
+	\item \textbf{Tính xác định}: Các đầu vào giống hệt nhau luôn trả về cùng một kết quả băm như nhau, đảm bảo tính toàn vẹn dữ liệu.
+	\item \textbf{Tính toán nhanh}: Hàm băm cung cấp khả năng xử lý. tính toán nhanh chóng và hiệu quả, phù hợp đối với các tác vụ xử lý tập dữ liệu lớn và các ứng dụng theo thời gian thực.
+	\item \textbf{Tính kháng tiền ảnh thứ nhất}: Hàm băn làm quá trình tìm, khôi phục dữ liệu ban đầu từ giá trị băm của chúng trở nên khó khăn.
+	\item \textbf{Tính kháng tiền ảnh thứ hai}: Cho một đầu vào và giá trị băm của chúng, rất khó khăn để tìm ra một đầu vào khác nhưng vẫn trả về cùng một giá trị băm.
+	\item \textbf{Tính kháng va chạm}: Rất khó để tìm ra hai đầu vào khác nhau nhưng trả về cùng một giá trị băm.
+	\item \textbf{Hiệu ứng tuyết lở}: Chỉ với một thay đổi nhỏ, chẳng hạn như thay đổi 1 bit của dữ liệu đầu vào, cũng làm cho giá trị băm của chúng thay đổi rất nhiều, không thể đoán được. \nocite{geeksforgeeks_hash_function}
+
+\end{itemize}
+
+
+\subsection{Chữ ký số}
+
+Chữ ký số là một phương pháp trong mật mã học sử dụng các công cụ Toán học. Chữ ký số được dùng để xác nhận tính xác thực, đảm bảo tính toàn vẹn và không khoái thác của một tin nhắn số hoặc tài liệu số. 
+
+Chúng giúp đảm bảo rằng trong quá trình truyền đi thông điệp, thông tin bên trong không bị chuyển đổi, cũng như biết được danh tính người gửi thông điệp ấy. \nocite{geeksforgeeks_digi}
+
+Các đặc điểm chính của chữ ký số:
+\begin{itemize}
+	\item \textbf{Tính xác thực}: Xác định được định danh của người kí.
+	\item \textbf{Tính toàn vẹn}: Đảm bảo nội dung không bị chuyển đổi.
+	\item \textbf{Tính chống thoái thác}: Người kí không thể từ chối tài liệu, hợp đồng đã được kí.
+	\item \textbf{Công chứng}: Trong một vài trường hợp, thời điểm thực hiện chữ ký số (timestamp) có thể được xem như sự công chứng hợp pháp. 
+	
+\end{itemize}
+
+
+\section{Mối quan hệ giữa các kỹ thuật}
+
+Thuật toán mã hóa đối xứng, mã hóa bất đối xứng, cũng như hàm băm đóng vai trò thành phần cốt lõi trong quá trình tạo chữ ký số, cũng như xác thực chữ ký.
+
+\textbf{Cặp khóa công khai - bí mật}: Đảm bảo tính xác thực trong các giao dịch số. Khóa bí mật sẽ do phía bên sở hữu giữ và chúng được dùng để tạo chữ ký số. Ngược lại, khóa công khai được chia sẻ với các bên có liên quan nhằm xác thực và kiểm tra tính hợp lệ của chữ ký.
+
+\textbf{Mã băm dữ liệu}: Thông điệp, tài liệu ban đầu là đầu vào của một hàm băm và chúng sinh ra một giá trị có kích thước cố định, kết quả đầu ra sau khi băm còn được gọi là \textbf{mã xác thực thông điệp} (message digest). Mã xác thực thông điệp này sau đó được mã hóa sử dụng khóa bí mật của bên sở hữu thông điệp. Chữ ký số lúc này được tạo ra chính là đầu ra của quá trình mã hóa.
+
+\textbf{Xác thực chữ ký}: Bên nhận sẽ sử dụng khóa công khai tương ứng để giải mã chữ ký số, trả về mã băm dữ liệu. Người nhận sẽ dùng cùng một hàm băm với bên gửi để băm thông điệp đã được nhận. Nếu như hai giá trị băm khớp nhau, chữ ký hợp lệ. Ngược lại, thông điệp này đã có sự thay đổi trong quá trình truyền tin hoặc thông điệp này không hợp lệ. \nocite{geeksforgeeks_digi}
+
